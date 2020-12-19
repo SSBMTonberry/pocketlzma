@@ -64,9 +64,1527 @@ namespace plz
 #ifndef LZMA_COMMON_H
 #define LZMA_COMMON_H
 
-#include "sysdefs.h"
-#include "mythread.h"
-#include "tuklib_integer.h"
+//#include "../tuklib/sysdefs.h"
+
+/*** Start of inlined file: mythread.h ***/
+///////////////////////////////////////////////////////////////////////////////
+//
+/// \file       mythread.h
+/// \brief      Some threading related helper macros and functions
+//
+//  Author:     Lasse Collin
+//
+//  This file has been put into the public domain.
+//  You can do whatever you want with this file.
+//
+///////////////////////////////////////////////////////////////////////////////
+
+#ifndef MYTHREAD_H
+#define MYTHREAD_H
+
+
+/*** Start of inlined file: sysdefs.h ***/
+///////////////////////////////////////////////////////////////////////////////
+//
+/// \file       sysdefs.h
+/// \brief      Common includes, definitions, system-specific things etc.
+///
+/// This file is used also by the lzma command line tool, that's why this
+/// file is separate from common.h.
+//
+//  Author:     Lasse Collin
+//
+//  This file has been put into the public domain.
+//  You can do whatever you want with this file.
+//
+///////////////////////////////////////////////////////////////////////////////
+
+#ifndef LZMA_SYSDEFS_H
+#define LZMA_SYSDEFS_H
+
+//////////////
+// Includes //
+//////////////
+
+//RBP: Defined this, as this is intended to be used with modern c++
+#define HAVE_STDBOOL_H
+
+#ifdef HAVE_CONFIG_H
+#	include <config.h>
+#endif
+
+// Get standard-compliant stdio functions under MinGW and MinGW-w64.
+#ifdef __MINGW32__
+#	define __USE_MINGW_ANSI_STDIO 1
+#endif
+
+// size_t and NULL
+#include <stddef.h>
+
+#ifdef HAVE_INTTYPES_H
+#	include <inttypes.h>
+#endif
+
+// C99 says that inttypes.h always includes stdint.h, but some systems
+// don't do that, and require including stdint.h separately.
+#ifdef HAVE_STDINT_H
+#	include <stdint.h>
+#endif
+
+// Some pre-C99 systems have SIZE_MAX in limits.h instead of stdint.h. The
+// limits are also used to figure out some macros missing from pre-C99 systems.
+#include <limits.h>
+
+// Be more compatible with systems that have non-conforming inttypes.h.
+// We assume that int is 32-bit and that long is either 32-bit or 64-bit.
+// Full Autoconf test could be more correct, but this should work well enough.
+// Note that this duplicates some code from lzma.h, but this is better since
+// we can work without inttypes.h thanks to Autoconf tests.
+#ifndef UINT32_C
+#	if UINT_MAX != 4294967295U
+#		error UINT32_C is not defined and unsigned int is not 32-bit.
+#	endif
+#	define UINT32_C(n) n ## U
+#endif
+#ifndef UINT32_MAX
+#	define UINT32_MAX UINT32_C(4294967295)
+#endif
+#ifndef PRIu32
+#	define PRIu32 "u"
+#endif
+#ifndef PRIx32
+#	define PRIx32 "x"
+#endif
+#ifndef PRIX32
+#	define PRIX32 "X"
+#endif
+
+#if ULONG_MAX == 4294967295UL
+#	ifndef UINT64_C
+#		define UINT64_C(n) n ## ULL
+#	endif
+#	ifndef PRIu64
+#		define PRIu64 "llu"
+#	endif
+#	ifndef PRIx64
+#		define PRIx64 "llx"
+#	endif
+#	ifndef PRIX64
+#		define PRIX64 "llX"
+#	endif
+#else
+#	ifndef UINT64_C
+#		define UINT64_C(n) n ## UL
+#	endif
+#	ifndef PRIu64
+#		define PRIu64 "lu"
+#	endif
+#	ifndef PRIx64
+#		define PRIx64 "lx"
+#	endif
+#	ifndef PRIX64
+#		define PRIX64 "lX"
+#	endif
+#endif
+#ifndef UINT64_MAX
+#	define UINT64_MAX UINT64_C(18446744073709551615)
+#endif
+
+// Incorrect(?) SIZE_MAX:
+//   - Interix headers typedef size_t to unsigned long,
+//     but a few lines later define SIZE_MAX to INT32_MAX.
+//   - SCO OpenServer (x86) headers typedef size_t to unsigned int
+//     but define SIZE_MAX to INT32_MAX.
+#if defined(__INTERIX) || defined(_SCO_DS)
+#	undef SIZE_MAX
+#endif
+
+// The code currently assumes that size_t is either 32-bit or 64-bit.
+//RBP: commented out
+//#ifndef SIZE_MAX
+//#	if SIZEOF_SIZE_T == 4
+//#		define SIZE_MAX UINT32_MAX
+//#	elif SIZEOF_SIZE_T == 8
+//#		define SIZE_MAX UINT64_MAX
+//#	else
+//#		error size_t is not 32-bit or 64-bit
+//#	endif
+//#endif
+
+//RBP: commented out
+//#if SIZE_MAX != UINT32_MAX && SIZE_MAX != UINT64_MAX
+//#	error size_t is not 32-bit or 64-bit
+//#endif
+
+#include <stdlib.h>
+#include <assert.h>
+
+// Pre-C99 systems lack stdbool.h. All the code in LZMA Utils must be written
+// so that it works with fake bool type, for example:
+//
+//    bool foo = (flags & 0x100) != 0;
+//    bool bar = !!(flags & 0x100);
+//
+// This works with the real C99 bool but breaks with fake bool:
+//
+//    bool baz = (flags & 0x100);
+//
+
+#ifdef HAVE_STDBOOL_H
+#	include <stdbool.h>
+#else
+#	if ! HAVE__BOOL
+typedef unsigned char _Bool;
+#	endif
+#	define bool _Bool
+#	define false 0
+#	define true 1
+#	define __bool_true_false_are_defined 1
+#endif
+
+// string.h should be enough but let's include strings.h and memory.h too if
+// they exists, since that shouldn't do any harm, but may improve portability.
+#include <string.h>
+
+#ifdef HAVE_STRINGS_H
+#	include <strings.h>
+#endif
+
+#ifdef HAVE_MEMORY_H
+#	include <memory.h>
+#endif
+
+// As of MSVC 2013, inline and restrict are supported with
+// non-standard keywords.
+#if defined(_WIN32) && defined(_MSC_VER)
+#	ifndef inline
+#		define inline __inline
+#	endif
+#	ifndef restrict
+#		define restrict __restrict
+#	endif
+#endif
+
+////////////
+// Macros //
+////////////
+
+#undef memzero
+#define memzero(s, n) memset(s, 0, n)
+
+// NOTE: Avoid using MIN() and MAX(), because even conditionally defining
+// those macros can cause some portability trouble, since on some systems
+// the system headers insist defining their own versions.
+#define my_min(x, y) ((x) < (y) ? (x) : (y))
+#define my_max(x, y) ((x) > (y) ? (x) : (y))
+
+#ifndef ARRAY_SIZE
+#	define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+#endif
+
+#if defined(__GNUC__) \
+		&& ((__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __GNUC__ > 4)
+#	define lzma_attr_alloc_size(x) __attribute__((__alloc_size__(x)))
+#else
+#	define lzma_attr_alloc_size(x)
+#endif
+
+#endif
+
+/*** End of inlined file: sysdefs.h ***/
+
+// If any type of threading is enabled, #define MYTHREAD_ENABLED.
+#if defined(MYTHREAD_POSIX) || defined(MYTHREAD_WIN95) \
+		|| defined(MYTHREAD_VISTA)
+#	define MYTHREAD_ENABLED 1
+#endif
+
+#ifdef MYTHREAD_ENABLED
+
+////////////////////////////////////////
+// Shared between all threading types //
+////////////////////////////////////////
+
+// Locks a mutex for a duration of a block.
+//
+// Perform mythread_mutex_lock(&mutex) in the beginning of a block
+// and mythread_mutex_unlock(&mutex) at the end of the block. "break"
+// may be used to unlock the mutex and jump out of the block.
+// mythread_sync blocks may be nested.
+//
+// Example:
+//
+//     mythread_sync(mutex) {
+//         foo();
+//         if (some_error)
+//             break; // Skips bar()
+//         bar();
+//     }
+//
+// At least GCC optimizes the loops completely away so it doesn't slow
+// things down at all compared to plain mythread_mutex_lock(&mutex)
+// and mythread_mutex_unlock(&mutex) calls.
+//
+#define mythread_sync(mutex) mythread_sync_helper1(mutex, __LINE__)
+#define mythread_sync_helper1(mutex, line) mythread_sync_helper2(mutex, line)
+#define mythread_sync_helper2(mutex, line) \
+	for (unsigned int mythread_i_ ## line = 0; \
+			mythread_i_ ## line \
+				? (mythread_mutex_unlock(&(mutex)), 0) \
+				: (mythread_mutex_lock(&(mutex)), 1); \
+			mythread_i_ ## line = 1) \
+		for (unsigned int mythread_j_ ## line = 0; \
+				!mythread_j_ ## line; \
+				mythread_j_ ## line = 1)
+#endif
+
+#if !defined(MYTHREAD_ENABLED)
+
+//////////////////
+// No threading //
+//////////////////
+
+// Calls the given function once. This isn't thread safe.
+#define mythread_once(func) \
+do { \
+	static bool once_ = false; \
+	if (!once_) { \
+		func(); \
+		once_ = true; \
+	} \
+} while (0)
+
+#if !(defined(_WIN32) && !defined(__CYGWIN__))
+// Use sigprocmask() to set the signal mask in single-threaded programs.
+#include <signal.h>
+
+static inline void
+mythread_sigmask(int how, const sigset_t *restrict set,
+		sigset_t *restrict oset)
+{
+	int ret = sigprocmask(how, set, oset);
+	assert(ret == 0);
+	(void)ret;
+}
+#endif
+
+#elif defined(MYTHREAD_POSIX)
+
+////////////////////
+// Using pthreads //
+////////////////////
+
+#include <sys/time.h>
+#include <pthread.h>
+#include <signal.h>
+#include <time.h>
+#include <errno.h>
+
+#define MYTHREAD_RET_TYPE void *
+#define MYTHREAD_RET_VALUE NULL
+
+typedef pthread_t mythread;
+typedef pthread_mutex_t mythread_mutex;
+
+typedef struct {
+	pthread_cond_t cond;
+#ifdef HAVE_CLOCK_GETTIME
+	// Clock ID (CLOCK_REALTIME or CLOCK_MONOTONIC) associated with
+	// the condition variable.
+	clockid_t clk_id;
+#endif
+} mythread_cond;
+
+typedef struct timespec mythread_condtime;
+
+// Calls the given function once in a thread-safe way.
+#define mythread_once(func) \
+	do { \
+		static pthread_once_t once_ = PTHREAD_ONCE_INIT; \
+		pthread_once(&once_, &func); \
+	} while (0)
+
+// Use pthread_sigmask() to set the signal mask in multi-threaded programs.
+// Do nothing on OpenVMS since it lacks pthread_sigmask().
+static inline void
+mythread_sigmask(int how, const sigset_t *restrict set,
+		sigset_t *restrict oset)
+{
+#ifdef __VMS
+	(void)how;
+	(void)set;
+	(void)oset;
+#else
+	int ret = pthread_sigmask(how, set, oset);
+	assert(ret == 0);
+	(void)ret;
+#endif
+}
+
+// Creates a new thread with all signals blocked. Returns zero on success
+// and non-zero on error.
+static inline int
+mythread_create(mythread *thread, void *(*func)(void *arg), void *arg)
+{
+	sigset_t old;
+	sigset_t all;
+	sigfillset(&all);
+
+	mythread_sigmask(SIG_SETMASK, &all, &old);
+	const int ret = pthread_create(thread, NULL, func, arg);
+	mythread_sigmask(SIG_SETMASK, &old, NULL);
+
+	return ret;
+}
+
+// Joins a thread. Returns zero on success and non-zero on error.
+static inline int
+mythread_join(mythread thread)
+{
+	return pthread_join(thread, NULL);
+}
+
+// Initiatlizes a mutex. Returns zero on success and non-zero on error.
+static inline int
+mythread_mutex_init(mythread_mutex *mutex)
+{
+	return pthread_mutex_init(mutex, NULL);
+}
+
+static inline void
+mythread_mutex_destroy(mythread_mutex *mutex)
+{
+	int ret = pthread_mutex_destroy(mutex);
+	assert(ret == 0);
+	(void)ret;
+}
+
+static inline void
+mythread_mutex_lock(mythread_mutex *mutex)
+{
+	int ret = pthread_mutex_lock(mutex);
+	assert(ret == 0);
+	(void)ret;
+}
+
+static inline void
+mythread_mutex_unlock(mythread_mutex *mutex)
+{
+	int ret = pthread_mutex_unlock(mutex);
+	assert(ret == 0);
+	(void)ret;
+}
+
+// Initializes a condition variable.
+//
+// Using CLOCK_MONOTONIC instead of the default CLOCK_REALTIME makes the
+// timeout in pthread_cond_timedwait() work correctly also if system time
+// is suddenly changed. Unfortunately CLOCK_MONOTONIC isn't available
+// everywhere while the default CLOCK_REALTIME is, so the default is
+// used if CLOCK_MONOTONIC isn't available.
+//
+// If clock_gettime() isn't available at all, gettimeofday() will be used.
+static inline int
+mythread_cond_init(mythread_cond *mycond)
+{
+#ifdef HAVE_CLOCK_GETTIME
+	// NOTE: HAVE_DECL_CLOCK_MONOTONIC is always defined to 0 or 1.
+#	if defined(HAVE_PTHREAD_CONDATTR_SETCLOCK) && HAVE_DECL_CLOCK_MONOTONIC
+	struct timespec ts;
+	pthread_condattr_t condattr;
+
+	// POSIX doesn't seem to *require* that pthread_condattr_setclock()
+	// will fail if given an unsupported clock ID. Test that
+	// CLOCK_MONOTONIC really is supported using clock_gettime().
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0
+			&& pthread_condattr_init(&condattr) == 0) {
+		int ret = pthread_condattr_setclock(
+				&condattr, CLOCK_MONOTONIC);
+		if (ret == 0)
+			ret = pthread_cond_init(&mycond->cond, &condattr);
+
+		pthread_condattr_destroy(&condattr);
+
+		if (ret == 0) {
+			mycond->clk_id = CLOCK_MONOTONIC;
+			return 0;
+		}
+	}
+
+	// If anything above fails, fall back to the default CLOCK_REALTIME.
+	// POSIX requires that all implementations of clock_gettime() must
+	// support at least CLOCK_REALTIME.
+#	endif
+
+	mycond->clk_id = CLOCK_REALTIME;
+#endif
+
+	return pthread_cond_init(&mycond->cond, NULL);
+}
+
+static inline void
+mythread_cond_destroy(mythread_cond *cond)
+{
+	int ret = pthread_cond_destroy(&cond->cond);
+	assert(ret == 0);
+	(void)ret;
+}
+
+static inline void
+mythread_cond_signal(mythread_cond *cond)
+{
+	int ret = pthread_cond_signal(&cond->cond);
+	assert(ret == 0);
+	(void)ret;
+}
+
+static inline void
+mythread_cond_wait(mythread_cond *cond, mythread_mutex *mutex)
+{
+	int ret = pthread_cond_wait(&cond->cond, mutex);
+	assert(ret == 0);
+	(void)ret;
+}
+
+// Waits on a condition or until a timeout expires. If the timeout expires,
+// non-zero is returned, otherwise zero is returned.
+static inline int
+mythread_cond_timedwait(mythread_cond *cond, mythread_mutex *mutex,
+		const mythread_condtime *condtime)
+{
+	int ret = pthread_cond_timedwait(&cond->cond, mutex, condtime);
+	assert(ret == 0 || ret == ETIMEDOUT);
+	return ret;
+}
+
+// Sets condtime to the absolute time that is timeout_ms milliseconds
+// in the future. The type of the clock to use is taken from cond.
+static inline void
+mythread_condtime_set(mythread_condtime *condtime, const mythread_cond *cond,
+		uint32_t timeout_ms)
+{
+	condtime->tv_sec = timeout_ms / 1000;
+	condtime->tv_nsec = (timeout_ms % 1000) * 1000000;
+
+#ifdef HAVE_CLOCK_GETTIME
+	struct timespec now;
+	int ret = clock_gettime(cond->clk_id, &now);
+	assert(ret == 0);
+	(void)ret;
+
+	condtime->tv_sec += now.tv_sec;
+	condtime->tv_nsec += now.tv_nsec;
+#else
+	(void)cond;
+
+	struct timeval now;
+	gettimeofday(&now, NULL);
+
+	condtime->tv_sec += now.tv_sec;
+	condtime->tv_nsec += now.tv_usec * 1000L;
+#endif
+
+	// tv_nsec must stay in the range [0, 999_999_999].
+	if (condtime->tv_nsec >= 1000000000L) {
+		condtime->tv_nsec -= 1000000000L;
+		++condtime->tv_sec;
+	}
+}
+
+#elif defined(MYTHREAD_WIN95) || defined(MYTHREAD_VISTA)
+
+/////////////////////
+// Windows threads //
+/////////////////////
+
+#define WIN32_LEAN_AND_MEAN
+#ifdef MYTHREAD_VISTA
+#	undef _WIN32_WINNT
+#	define _WIN32_WINNT 0x0600
+#endif
+#include <windows.h>
+#include <process.h>
+
+#define MYTHREAD_RET_TYPE unsigned int __stdcall
+#define MYTHREAD_RET_VALUE 0
+
+typedef HANDLE mythread;
+typedef CRITICAL_SECTION mythread_mutex;
+
+#ifdef MYTHREAD_WIN95
+typedef HANDLE mythread_cond;
+#else
+typedef CONDITION_VARIABLE mythread_cond;
+#endif
+
+typedef struct {
+	// Tick count (milliseconds) in the beginning of the timeout.
+	// NOTE: This is 32 bits so it wraps around after 49.7 days.
+	// Multi-day timeouts may not work as expected.
+	DWORD start;
+
+	// Length of the timeout in milliseconds. The timeout expires
+	// when the current tick count minus "start" is equal or greater
+	// than "timeout".
+	DWORD timeout;
+} mythread_condtime;
+
+// mythread_once() is only available with Vista threads.
+#ifdef MYTHREAD_VISTA
+#define mythread_once(func) \
+	do { \
+		static INIT_ONCE once_ = INIT_ONCE_STATIC_INIT; \
+		BOOL pending_; \
+		if (!InitOnceBeginInitialize(&once_, 0, &pending_, NULL)) \
+			abort(); \
+		if (pending_) \
+			func(); \
+		if (!InitOnceComplete(&once, 0, NULL)) \
+			abort(); \
+	} while (0)
+#endif
+
+// mythread_sigmask() isn't available on Windows. Even a dummy version would
+// make no sense because the other POSIX signal functions are missing anyway.
+
+static inline int
+mythread_create(mythread *thread,
+		unsigned int (__stdcall *func)(void *arg), void *arg)
+{
+	uintptr_t ret = _beginthreadex(NULL, 0, func, arg, 0, NULL);
+	if (ret == 0)
+		return -1;
+
+	*thread = (HANDLE)ret;
+	return 0;
+}
+
+static inline int
+mythread_join(mythread thread)
+{
+	int ret = 0;
+
+	if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0)
+		ret = -1;
+
+	if (!CloseHandle(thread))
+		ret = -1;
+
+	return ret;
+}
+
+static inline int
+mythread_mutex_init(mythread_mutex *mutex)
+{
+	InitializeCriticalSection(mutex);
+	return 0;
+}
+
+static inline void
+mythread_mutex_destroy(mythread_mutex *mutex)
+{
+	DeleteCriticalSection(mutex);
+}
+
+static inline void
+mythread_mutex_lock(mythread_mutex *mutex)
+{
+	EnterCriticalSection(mutex);
+}
+
+static inline void
+mythread_mutex_unlock(mythread_mutex *mutex)
+{
+	LeaveCriticalSection(mutex);
+}
+
+static inline int
+mythread_cond_init(mythread_cond *cond)
+{
+#ifdef MYTHREAD_WIN95
+	*cond = CreateEvent(NULL, FALSE, FALSE, NULL);
+	return *cond == NULL ? -1 : 0;
+#else
+	InitializeConditionVariable(cond);
+	return 0;
+#endif
+}
+
+static inline void
+mythread_cond_destroy(mythread_cond *cond)
+{
+#ifdef MYTHREAD_WIN95
+	CloseHandle(*cond);
+#else
+	(void)cond;
+#endif
+}
+
+static inline void
+mythread_cond_signal(mythread_cond *cond)
+{
+#ifdef MYTHREAD_WIN95
+	SetEvent(*cond);
+#else
+	WakeConditionVariable(cond);
+#endif
+}
+
+static inline void
+mythread_cond_wait(mythread_cond *cond, mythread_mutex *mutex)
+{
+#ifdef MYTHREAD_WIN95
+	LeaveCriticalSection(mutex);
+	WaitForSingleObject(*cond, INFINITE);
+	EnterCriticalSection(mutex);
+#else
+	BOOL ret = SleepConditionVariableCS(cond, mutex, INFINITE);
+	assert(ret);
+	(void)ret;
+#endif
+}
+
+static inline int
+mythread_cond_timedwait(mythread_cond *cond, mythread_mutex *mutex,
+		const mythread_condtime *condtime)
+{
+#ifdef MYTHREAD_WIN95
+	LeaveCriticalSection(mutex);
+#endif
+
+	DWORD elapsed = GetTickCount() - condtime->start;
+	DWORD timeout = elapsed >= condtime->timeout
+			? 0 : condtime->timeout - elapsed;
+
+#ifdef MYTHREAD_WIN95
+	DWORD ret = WaitForSingleObject(*cond, timeout);
+	assert(ret == WAIT_OBJECT_0 || ret == WAIT_TIMEOUT);
+
+	EnterCriticalSection(mutex);
+
+	return ret == WAIT_TIMEOUT;
+#else
+	BOOL ret = SleepConditionVariableCS(cond, mutex, timeout);
+	assert(ret || GetLastError() == ERROR_TIMEOUT);
+	return !ret;
+#endif
+}
+
+static inline void
+mythread_condtime_set(mythread_condtime *condtime, const mythread_cond *cond,
+		uint32_t timeout)
+{
+	(void)cond;
+	condtime->start = GetTickCount();
+	condtime->timeout = timeout;
+}
+
+#endif
+
+#endif
+
+/*** End of inlined file: mythread.h ***/
+
+
+
+/*** Start of inlined file: tuklib_integer.h ***/
+///////////////////////////////////////////////////////////////////////////////
+//
+/// \file       tuklib_integer.h
+/// \brief      Various integer and bit operations
+///
+/// This file provides macros or functions to do some basic integer and bit
+/// operations.
+///
+/// Native endian inline functions (XX = 16, 32, or 64):
+///   - Unaligned native endian reads: readXXne(ptr)
+///   - Unaligned native endian writes: writeXXne(ptr, num)
+///   - Aligned native endian reads: aligned_readXXne(ptr)
+///   - Aligned native endian writes: aligned_writeXXne(ptr, num)
+///
+/// Endianness-converting integer operations (these can be macros!)
+/// (XX = 16, 32, or 64; Y = b or l):
+///   - Byte swapping: bswapXX(num)
+///   - Byte order conversions to/from native (byteswaps if Y isn't
+///     the native endianness): convXXYe(num)
+///   - Unaligned reads (16/32-bit only): readXXYe(ptr)
+///   - Unaligned writes (16/32-bit only): writeXXYe(ptr, num)
+///   - Aligned reads: aligned_readXXYe(ptr)
+///   - Aligned writes: aligned_writeXXYe(ptr, num)
+///
+/// Since the above can macros, the arguments should have no side effects
+/// because they may be evaluated more than once.
+///
+/// Bit scan operations for non-zero 32-bit integers (inline functions):
+///   - Bit scan reverse (find highest non-zero bit): bsr32(num)
+///   - Count leading zeros: clz32(num)
+///   - Count trailing zeros: ctz32(num)
+///   - Bit scan forward (simply an alias for ctz32()): bsf32(num)
+///
+/// The above bit scan operations return 0-31. If num is zero,
+/// the result is undefined.
+//
+//  Authors:    Lasse Collin
+//              Joachim Henke
+//
+//  This file has been put into the public domain.
+//  You can do whatever you want with this file.
+//
+///////////////////////////////////////////////////////////////////////////////
+
+#ifndef TUKLIB_INTEGER_H
+#define TUKLIB_INTEGER_H
+
+
+/*** Start of inlined file: tuklib_common.h ***/
+///////////////////////////////////////////////////////////////////////////////
+//
+/// \file       tuklib_common.h
+/// \brief      Common definitions for tuklib modules
+//
+//  Author:     Lasse Collin
+//
+//  This file has been put into the public domain.
+//  You can do whatever you want with this file.
+//
+///////////////////////////////////////////////////////////////////////////////
+
+#ifndef TUKLIB_COMMON_H
+#define TUKLIB_COMMON_H
+
+// The config file may be replaced by a package-specific file.
+// It should include at least stddef.h, inttypes.h, and limits.h.
+
+/*** Start of inlined file: tuklib_config.h ***/
+#ifdef HAVE_CONFIG_H
+
+#else
+#	include <stddef.h>
+#	include <inttypes.h>
+#	include <limits.h>
+#endif
+
+/*** End of inlined file: tuklib_config.h ***/
+
+
+// TUKLIB_SYMBOL_PREFIX is prefixed to all symbols exported by
+// the tuklib modules. If you use a tuklib module in a library,
+// you should use TUKLIB_SYMBOL_PREFIX to make sure that there
+// are no symbol conflicts in case someone links your library
+// into application that also uses the same tuklib module.
+#ifndef TUKLIB_SYMBOL_PREFIX
+#	define TUKLIB_SYMBOL_PREFIX
+#endif
+
+#define TUKLIB_CAT_X(a, b) a ## b
+#define TUKLIB_CAT(a, b) TUKLIB_CAT_X(a, b)
+
+#ifndef TUKLIB_SYMBOL
+#	define TUKLIB_SYMBOL(sym) TUKLIB_CAT(TUKLIB_SYMBOL_PREFIX, sym)
+#endif
+
+#ifndef TUKLIB_DECLS_BEGIN
+#	ifdef __cplusplus
+#		define TUKLIB_DECLS_BEGIN extern "C" {
+#	else
+#		define TUKLIB_DECLS_BEGIN
+#	endif
+#endif
+
+#ifndef TUKLIB_DECLS_END
+#	ifdef __cplusplus
+#		define TUKLIB_DECLS_END }
+#	else
+#		define TUKLIB_DECLS_END
+#	endif
+#endif
+
+#if defined(__GNUC__) && defined(__GNUC_MINOR__)
+#	define TUKLIB_GNUC_REQ(major, minor) \
+		((__GNUC__ == (major) && __GNUC_MINOR__ >= (minor)) \
+			|| __GNUC__ > (major))
+#else
+#	define TUKLIB_GNUC_REQ(major, minor) 0
+#endif
+
+#if TUKLIB_GNUC_REQ(2, 5)
+#	define tuklib_attr_noreturn __attribute__((__noreturn__))
+#else
+#	define tuklib_attr_noreturn
+#endif
+
+#if (defined(_WIN32) && !defined(__CYGWIN__)) \
+		|| defined(__OS2__) || defined(__MSDOS__)
+#	define TUKLIB_DOSLIKE 1
+#endif
+
+#endif
+
+/*** End of inlined file: tuklib_common.h ***/
+
+#include <string.h>
+
+// Newer Intel C compilers require immintrin.h for _bit_scan_reverse()
+// and such functions.
+#if defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 1500)
+#	include <immintrin.h>
+#endif
+
+///////////////////
+// Byte swapping //
+///////////////////
+
+#if defined(HAVE___BUILTIN_BSWAPXX)
+	// GCC >= 4.8 and Clang
+#	define bswap16(n) __builtin_bswap16(n)
+#	define bswap32(n) __builtin_bswap32(n)
+#	define bswap64(n) __builtin_bswap64(n)
+
+#elif defined(HAVE_BYTESWAP_H)
+	// glibc, uClibc, dietlibc
+#	include <byteswap.h>
+#	ifdef HAVE_BSWAP_16
+#		define bswap16(num) bswap_16(num)
+#	endif
+#	ifdef HAVE_BSWAP_32
+#		define bswap32(num) bswap_32(num)
+#	endif
+#	ifdef HAVE_BSWAP_64
+#		define bswap64(num) bswap_64(num)
+#	endif
+
+#elif defined(HAVE_SYS_ENDIAN_H)
+	// *BSDs and Darwin
+#	include <sys/endian.h>
+
+#elif defined(HAVE_SYS_BYTEORDER_H)
+	// Solaris
+#	include <sys/byteorder.h>
+#	ifdef BSWAP_16
+#		define bswap16(num) BSWAP_16(num)
+#	endif
+#	ifdef BSWAP_32
+#		define bswap32(num) BSWAP_32(num)
+#	endif
+#	ifdef BSWAP_64
+#		define bswap64(num) BSWAP_64(num)
+#	endif
+#	ifdef BE_16
+#		define conv16be(num) BE_16(num)
+#	endif
+#	ifdef BE_32
+#		define conv32be(num) BE_32(num)
+#	endif
+#	ifdef BE_64
+#		define conv64be(num) BE_64(num)
+#	endif
+#	ifdef LE_16
+#		define conv16le(num) LE_16(num)
+#	endif
+#	ifdef LE_32
+#		define conv32le(num) LE_32(num)
+#	endif
+#	ifdef LE_64
+#		define conv64le(num) LE_64(num)
+#	endif
+#endif
+
+#ifndef bswap16
+#	define bswap16(n) (uint16_t)( \
+		  (((n) & 0x00FFU) << 8) \
+		| (((n) & 0xFF00U) >> 8) \
+	)
+#endif
+
+#ifndef bswap32
+#	define bswap32(n) (uint32_t)( \
+		  (((n) & UINT32_C(0x000000FF)) << 24) \
+		| (((n) & UINT32_C(0x0000FF00)) << 8) \
+		| (((n) & UINT32_C(0x00FF0000)) >> 8) \
+		| (((n) & UINT32_C(0xFF000000)) >> 24) \
+	)
+#endif
+
+#ifndef bswap64
+#	define bswap64(n) (uint64_t)( \
+		  (((n) & UINT64_C(0x00000000000000FF)) << 56) \
+		| (((n) & UINT64_C(0x000000000000FF00)) << 40) \
+		| (((n) & UINT64_C(0x0000000000FF0000)) << 24) \
+		| (((n) & UINT64_C(0x00000000FF000000)) << 8) \
+		| (((n) & UINT64_C(0x000000FF00000000)) >> 8) \
+		| (((n) & UINT64_C(0x0000FF0000000000)) >> 24) \
+		| (((n) & UINT64_C(0x00FF000000000000)) >> 40) \
+		| (((n) & UINT64_C(0xFF00000000000000)) >> 56) \
+	)
+#endif
+
+// Define conversion macros using the basic byte swapping macros.
+#ifdef WORDS_BIGENDIAN
+#	ifndef conv16be
+#		define conv16be(num) ((uint16_t)(num))
+#	endif
+#	ifndef conv32be
+#		define conv32be(num) ((uint32_t)(num))
+#	endif
+#	ifndef conv64be
+#		define conv64be(num) ((uint64_t)(num))
+#	endif
+#	ifndef conv16le
+#		define conv16le(num) bswap16(num)
+#	endif
+#	ifndef conv32le
+#		define conv32le(num) bswap32(num)
+#	endif
+#	ifndef conv64le
+#		define conv64le(num) bswap64(num)
+#	endif
+#else
+#	ifndef conv16be
+#		define conv16be(num) bswap16(num)
+#	endif
+#	ifndef conv32be
+#		define conv32be(num) bswap32(num)
+#	endif
+#	ifndef conv64be
+#		define conv64be(num) bswap64(num)
+#	endif
+#	ifndef conv16le
+#		define conv16le(num) ((uint16_t)(num))
+#	endif
+#	ifndef conv32le
+#		define conv32le(num) ((uint32_t)(num))
+#	endif
+#	ifndef conv64le
+#		define conv64le(num) ((uint64_t)(num))
+#	endif
+#endif
+
+////////////////////////////////
+// Unaligned reads and writes //
+////////////////////////////////
+
+// The traditional way of casting e.g. *(const uint16_t *)uint8_pointer
+// is bad even if the uint8_pointer is properly aligned because this kind
+// of casts break strict aliasing rules and result in undefined behavior.
+// With unaligned pointers it's even worse: compilers may emit vector
+// instructions that require aligned pointers even if non-vector
+// instructions work with unaligned pointers.
+//
+// Using memcpy() is the standard compliant way to do unaligned access.
+// Many modern compilers inline it so there is no function call overhead.
+// For those compilers that don't handle the memcpy() method well, the
+// old casting method (that violates strict aliasing) can be requested at
+// build time. A third method, casting to a packed struct, would also be
+// an option but isn't provided to keep things simpler (it's already a mess).
+// Hopefully this is flexible enough in practice.
+
+static inline uint16_t
+read16ne(const uint8_t *buf)
+{
+#if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
+		&& defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING)
+	return *(const uint16_t *)buf;
+#else
+	uint16_t num;
+	memcpy(&num, buf, sizeof(num));
+	return num;
+#endif
+}
+
+static inline uint32_t
+read32ne(const uint8_t *buf)
+{
+#if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
+		&& defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING)
+	return *(const uint32_t *)buf;
+#else
+	uint32_t num;
+	memcpy(&num, buf, sizeof(num));
+	return num;
+#endif
+}
+
+static inline uint64_t
+read64ne(const uint8_t *buf)
+{
+#if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
+		&& defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING)
+	return *(const uint64_t *)buf;
+#else
+	uint64_t num;
+	memcpy(&num, buf, sizeof(num));
+	return num;
+#endif
+}
+
+static inline void
+write16ne(uint8_t *buf, uint16_t num)
+{
+#if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
+		&& defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING)
+	*(uint16_t *)buf = num;
+#else
+	memcpy(buf, &num, sizeof(num));
+#endif
+	return;
+}
+
+static inline void
+write32ne(uint8_t *buf, uint32_t num)
+{
+#if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
+		&& defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING)
+	*(uint32_t *)buf = num;
+#else
+	memcpy(buf, &num, sizeof(num));
+#endif
+	return;
+}
+
+static inline void
+write64ne(uint8_t *buf, uint64_t num)
+{
+#if defined(TUKLIB_FAST_UNALIGNED_ACCESS) \
+		&& defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING)
+	*(uint64_t *)buf = num;
+#else
+	memcpy(buf, &num, sizeof(num));
+#endif
+	return;
+}
+
+static inline uint16_t
+read16be(const uint8_t *buf)
+{
+#if defined(WORDS_BIGENDIAN) || defined(TUKLIB_FAST_UNALIGNED_ACCESS)
+	uint16_t num = read16ne(buf);
+	return conv16be(num);
+#else
+	uint16_t num = ((uint16_t)buf[0] << 8) | (uint16_t)buf[1];
+	return num;
+#endif
+}
+
+static inline uint16_t
+read16le(const uint8_t *buf)
+{
+#if !defined(WORDS_BIGENDIAN) || defined(TUKLIB_FAST_UNALIGNED_ACCESS)
+	uint16_t num = read16ne(buf);
+	return conv16le(num);
+#else
+	uint16_t num = ((uint16_t)buf[0]) | ((uint16_t)buf[1] << 8);
+	return num;
+#endif
+}
+
+static inline uint32_t
+read32be(const uint8_t *buf)
+{
+#if defined(WORDS_BIGENDIAN) || defined(TUKLIB_FAST_UNALIGNED_ACCESS)
+	uint32_t num = read32ne(buf);
+	return conv32be(num);
+#else
+	uint32_t num = (uint32_t)buf[0] << 24;
+	num |= (uint32_t)buf[1] << 16;
+	num |= (uint32_t)buf[2] << 8;
+	num |= (uint32_t)buf[3];
+	return num;
+#endif
+}
+
+static inline uint32_t
+read32le(const uint8_t *buf)
+{
+#if !defined(WORDS_BIGENDIAN) || defined(TUKLIB_FAST_UNALIGNED_ACCESS)
+	uint32_t num = read32ne(buf);
+	return conv32le(num);
+#else
+	uint32_t num = (uint32_t)buf[0];
+	num |= (uint32_t)buf[1] << 8;
+	num |= (uint32_t)buf[2] << 16;
+	num |= (uint32_t)buf[3] << 24;
+	return num;
+#endif
+}
+
+// NOTE: Possible byte swapping must be done in a macro to allow the compiler
+// to optimize byte swapping of constants when using glibc's or *BSD's
+// byte swapping macros. The actual write is done in an inline function
+// to make type checking of the buf pointer possible.
+#if defined(WORDS_BIGENDIAN) || defined(TUKLIB_FAST_UNALIGNED_ACCESS)
+#	define write16be(buf, num) write16ne(buf, conv16be(num))
+#	define write32be(buf, num) write32ne(buf, conv32be(num))
+#endif
+
+#if !defined(WORDS_BIGENDIAN) || defined(TUKLIB_FAST_UNALIGNED_ACCESS)
+#	define write16le(buf, num) write16ne(buf, conv16le(num))
+#	define write32le(buf, num) write32ne(buf, conv32le(num))
+#endif
+
+#ifndef write16be
+static inline void
+write16be(uint8_t *buf, uint16_t num)
+{
+	buf[0] = (uint8_t)(num >> 8);
+	buf[1] = (uint8_t)num;
+	return;
+}
+#endif
+
+#ifndef write16le
+static inline void
+write16le(uint8_t *buf, uint16_t num)
+{
+	buf[0] = (uint8_t)num;
+	buf[1] = (uint8_t)(num >> 8);
+	return;
+}
+#endif
+
+#ifndef write32be
+static inline void
+write32be(uint8_t *buf, uint32_t num)
+{
+	buf[0] = (uint8_t)(num >> 24);
+	buf[1] = (uint8_t)(num >> 16);
+	buf[2] = (uint8_t)(num >> 8);
+	buf[3] = (uint8_t)num;
+	return;
+}
+#endif
+
+#ifndef write32le
+static inline void
+write32le(uint8_t *buf, uint32_t num)
+{
+	buf[0] = (uint8_t)num;
+	buf[1] = (uint8_t)(num >> 8);
+	buf[2] = (uint8_t)(num >> 16);
+	buf[3] = (uint8_t)(num >> 24);
+	return;
+}
+#endif
+
+//////////////////////////////
+// Aligned reads and writes //
+//////////////////////////////
+
+// Separate functions for aligned reads and writes are provided since on
+// strict-align archs aligned access is much faster than unaligned access.
+//
+// Just like in the unaligned case, memcpy() is needed to avoid
+// strict aliasing violations. However, on archs that don't support
+// unaligned access the compiler cannot know that the pointers given
+// to memcpy() are aligned which results in slow code. As of C11 there is
+// no standard way to tell the compiler that we know that the address is
+// aligned but some compilers have language extensions to do that. With
+// such language extensions the memcpy() method gives excellent results.
+//
+// What to do on a strict-align system when no known language extentensions
+// are available? Falling back to byte-by-byte access would be safe but ruin
+// optimizations that have been made specifically with aligned access in mind.
+// As a compromise, aligned reads will fall back to non-compliant type punning
+// but aligned writes will be byte-by-byte, that is, fast reads are preferred
+// over fast writes. This obviously isn't great but hopefully it's a working
+// compromise for now.
+//
+// __builtin_assume_aligned is support by GCC >= 4.7 and clang >= 3.6.
+#ifdef HAVE___BUILTIN_ASSUME_ALIGNED
+#	define tuklib_memcpy_aligned(dest, src, size) \
+		memcpy(dest, __builtin_assume_aligned(src, size), size)
+#else
+#	define tuklib_memcpy_aligned(dest, src, size) \
+		memcpy(dest, src, size)
+#	ifndef TUKLIB_FAST_UNALIGNED_ACCESS
+#		define TUKLIB_USE_UNSAFE_ALIGNED_READS 1
+#	endif
+#endif
+
+static inline uint16_t
+aligned_read16ne(const uint8_t *buf)
+{
+#if defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING) \
+		|| defined(TUKLIB_USE_UNSAFE_ALIGNED_READS)
+	return *(const uint16_t *)buf;
+#else
+	uint16_t num;
+	tuklib_memcpy_aligned(&num, buf, sizeof(num));
+	return num;
+#endif
+}
+
+static inline uint32_t
+aligned_read32ne(const uint8_t *buf)
+{
+#if defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING) \
+		|| defined(TUKLIB_USE_UNSAFE_ALIGNED_READS)
+	return *(const uint32_t *)buf;
+#else
+	uint32_t num;
+	tuklib_memcpy_aligned(&num, buf, sizeof(num));
+	return num;
+#endif
+}
+
+static inline uint64_t
+aligned_read64ne(const uint8_t *buf)
+{
+#if defined(TUKLIB_USE_UNSAFE_TYPE_PUNNING) \
+		|| defined(TUKLIB_USE_UNSAFE_ALIGNED_READS)
+	return *(const uint64_t *)buf;
+#else
+	uint64_t num;
+	tuklib_memcpy_aligned(&num, buf, sizeof(num));
+	return num;
+#endif
+}
+
+static inline void
+aligned_write16ne(uint8_t *buf, uint16_t num)
+{
+#ifdef TUKLIB_USE_UNSAFE_TYPE_PUNNING
+	*(uint16_t *)buf = num;
+#else
+	tuklib_memcpy_aligned(buf, &num, sizeof(num));
+#endif
+	return;
+}
+
+static inline void
+aligned_write32ne(uint8_t *buf, uint32_t num)
+{
+#ifdef TUKLIB_USE_UNSAFE_TYPE_PUNNING
+	*(uint32_t *)buf = num;
+#else
+	tuklib_memcpy_aligned(buf, &num, sizeof(num));
+#endif
+	return;
+}
+
+static inline void
+aligned_write64ne(uint8_t *buf, uint64_t num)
+{
+#ifdef TUKLIB_USE_UNSAFE_TYPE_PUNNING
+	*(uint64_t *)buf = num;
+#else
+	tuklib_memcpy_aligned(buf, &num, sizeof(num));
+#endif
+	return;
+}
+
+static inline uint16_t
+aligned_read16be(const uint8_t *buf)
+{
+	uint16_t num = aligned_read16ne(buf);
+	return conv16be(num);
+}
+
+static inline uint16_t
+aligned_read16le(const uint8_t *buf)
+{
+	uint16_t num = aligned_read16ne(buf);
+	return conv16le(num);
+}
+
+static inline uint32_t
+aligned_read32be(const uint8_t *buf)
+{
+	uint32_t num = aligned_read32ne(buf);
+	return conv32be(num);
+}
+
+static inline uint32_t
+aligned_read32le(const uint8_t *buf)
+{
+	uint32_t num = aligned_read32ne(buf);
+	return conv32le(num);
+}
+
+static inline uint64_t
+aligned_read64be(const uint8_t *buf)
+{
+	uint64_t num = aligned_read64ne(buf);
+	return conv64be(num);
+}
+
+static inline uint64_t
+aligned_read64le(const uint8_t *buf)
+{
+	uint64_t num = aligned_read64ne(buf);
+	return conv64le(num);
+}
+
+// These need to be macros like in the unaligned case.
+#define aligned_write16be(buf, num) aligned_write16ne((buf), conv16be(num))
+#define aligned_write16le(buf, num) aligned_write16ne((buf), conv16le(num))
+#define aligned_write32be(buf, num) aligned_write32ne((buf), conv32be(num))
+#define aligned_write32le(buf, num) aligned_write32ne((buf), conv32le(num))
+#define aligned_write64be(buf, num) aligned_write64ne((buf), conv64be(num))
+#define aligned_write64le(buf, num) aligned_write64ne((buf), conv64le(num))
+
+////////////////////
+// Bit operations //
+////////////////////
+
+static inline uint32_t
+bsr32(uint32_t n)
+{
+	// Check for ICC first, since it tends to define __GNUC__ too.
+#if defined(__INTEL_COMPILER)
+	return _bit_scan_reverse(n);
+
+#elif TUKLIB_GNUC_REQ(3, 4) && UINT_MAX == UINT32_MAX
+	// GCC >= 3.4 has __builtin_clz(), which gives good results on
+	// multiple architectures. On x86, __builtin_clz() ^ 31U becomes
+	// either plain BSR (so the XOR gets optimized away) or LZCNT and
+	// XOR (if -march indicates that SSE4a instructions are supported).
+	return (uint32_t)__builtin_clz(n) ^ 31U;
+
+#elif defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
+	uint32_t i;
+	__asm__("bsrl %1, %0" : "=r" (i) : "rm" (n));
+	return i;
+
+#elif defined(_MSC_VER)
+	unsigned long i;
+	_BitScanReverse(&i, n);
+	return i;
+
+#else
+	uint32_t i = 31;
+
+	if ((n & 0xFFFF0000) == 0) {
+		n <<= 16;
+		i = 15;
+	}
+
+	if ((n & 0xFF000000) == 0) {
+		n <<= 8;
+		i -= 8;
+	}
+
+	if ((n & 0xF0000000) == 0) {
+		n <<= 4;
+		i -= 4;
+	}
+
+	if ((n & 0xC0000000) == 0) {
+		n <<= 2;
+		i -= 2;
+	}
+
+	if ((n & 0x80000000) == 0)
+		--i;
+
+	return i;
+#endif
+}
+
+static inline uint32_t
+clz32(uint32_t n)
+{
+#if defined(__INTEL_COMPILER)
+	return _bit_scan_reverse(n) ^ 31U;
+
+#elif TUKLIB_GNUC_REQ(3, 4) && UINT_MAX == UINT32_MAX
+	return (uint32_t)__builtin_clz(n);
+
+#elif defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
+	uint32_t i;
+	__asm__("bsrl %1, %0\n\t"
+		"xorl $31, %0"
+		: "=r" (i) : "rm" (n));
+	return i;
+
+#elif defined(_MSC_VER)
+	unsigned long i;
+	_BitScanReverse(&i, n);
+	return i ^ 31U;
+
+#else
+	uint32_t i = 0;
+
+	if ((n & 0xFFFF0000) == 0) {
+		n <<= 16;
+		i = 16;
+	}
+
+	if ((n & 0xFF000000) == 0) {
+		n <<= 8;
+		i += 8;
+	}
+
+	if ((n & 0xF0000000) == 0) {
+		n <<= 4;
+		i += 4;
+	}
+
+	if ((n & 0xC0000000) == 0) {
+		n <<= 2;
+		i += 2;
+	}
+
+	if ((n & 0x80000000) == 0)
+		++i;
+
+	return i;
+#endif
+}
+
+static inline uint32_t
+ctz32(uint32_t n)
+{
+#if defined(__INTEL_COMPILER)
+	return _bit_scan_forward(n);
+
+#elif TUKLIB_GNUC_REQ(3, 4) && UINT_MAX >= UINT32_MAX
+	return (uint32_t)__builtin_ctz(n);
+
+#elif defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
+	uint32_t i;
+	__asm__("bsfl %1, %0" : "=r" (i) : "rm" (n));
+	return i;
+
+#elif defined(_MSC_VER)
+	unsigned long i;
+	_BitScanForward(&i, n);
+	return i;
+
+#else
+	uint32_t i = 0;
+
+	if ((n & 0x0000FFFF) == 0) {
+		n >>= 16;
+		i = 16;
+	}
+
+	if ((n & 0x000000FF) == 0) {
+		n >>= 8;
+		i += 8;
+	}
+
+	if ((n & 0x0000000F) == 0) {
+		n >>= 4;
+		i += 4;
+	}
+
+	if ((n & 0x00000003) == 0) {
+		n >>= 2;
+		i += 2;
+	}
+
+	if ((n & 0x00000001) == 0)
+		++i;
+
+	return i;
+#endif
+}
+
+#define bsf32 ctz32
+
+#endif
+
+/*** End of inlined file: tuklib_integer.h ***/
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #	ifdef DLL_EXPORT
@@ -1311,7 +2829,61 @@ lzma_alone_decoder(lzma_stream *strm, uint64_t memlimit)
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "lzma_encoder.h"
+
+/*** Start of inlined file: lzma_encoder.h ***/
+///////////////////////////////////////////////////////////////////////////////
+//
+/// \file       lzma_encoder.h
+/// \brief      LZMA encoder API
+///
+//  Authors:    Igor Pavlov
+//              Lasse Collin
+//
+//  This file has been put into the public domain.
+//  You can do whatever you want with this file.
+//
+///////////////////////////////////////////////////////////////////////////////
+
+#ifndef LZMA_LZMA_ENCODER_H
+#define LZMA_LZMA_ENCODER_H
+
+#include "common.h"
+
+typedef struct lzma_lzma1_encoder_s lzma_lzma1_encoder;
+
+extern lzma_ret lzma_lzma_encoder_init(lzma_next_coder *next,
+		const lzma_allocator *allocator,
+		const lzma_filter_info *filters);
+
+extern uint64_t lzma_lzma_encoder_memusage(const void *options);
+
+extern lzma_ret lzma_lzma_props_encode(const void *options, uint8_t *out);
+
+/// Encodes lc/lp/pb into one byte. Returns false on success and true on error.
+extern bool lzma_lzma_lclppb_encode(
+		const lzma_options_lzma *options, uint8_t *byte);
+
+#ifdef LZMA_LZ_ENCODER_H
+
+/// Initializes raw LZMA encoder; this is used by LZMA2.
+extern lzma_ret lzma_lzma_encoder_create(
+		void **coder_ptr, const lzma_allocator *allocator,
+		const lzma_options_lzma *options, lzma_lz_options *lz_options);
+
+/// Resets an already initialized LZMA encoder; this is used by LZMA2.
+extern lzma_ret lzma_lzma_encoder_reset(
+		lzma_lzma1_encoder *coder, const lzma_options_lzma *options);
+
+extern lzma_ret lzma_lzma_encode(lzma_lzma1_encoder *restrict coder,
+		lzma_mf *restrict mf, uint8_t *restrict out,
+		size_t *restrict out_pos, size_t out_size,
+		uint32_t read_limit);
+
+#endif
+
+#endif
+
+/*** End of inlined file: lzma_encoder.h ***/
 
 #define ALONE_HEADER_SIZE (1 + 4 + 8)
 
@@ -10409,62 +11981,6 @@ extern uint64_t lzma_lzma_decoder_memusage_nocheck(const void *options);
 #endif
 
 /*** End of inlined file: lzma_decoder.h ***/
-
-
-/*** Start of inlined file: lzma_encoder.h ***/
-///////////////////////////////////////////////////////////////////////////////
-//
-/// \file       lzma_encoder.h
-/// \brief      LZMA encoder API
-///
-//  Authors:    Igor Pavlov
-//              Lasse Collin
-//
-//  This file has been put into the public domain.
-//  You can do whatever you want with this file.
-//
-///////////////////////////////////////////////////////////////////////////////
-
-#ifndef LZMA_LZMA_ENCODER_H
-#define LZMA_LZMA_ENCODER_H
-
-#include "common.h"
-
-typedef struct lzma_lzma1_encoder_s lzma_lzma1_encoder;
-
-extern lzma_ret lzma_lzma_encoder_init(lzma_next_coder *next,
-		const lzma_allocator *allocator,
-		const lzma_filter_info *filters);
-
-extern uint64_t lzma_lzma_encoder_memusage(const void *options);
-
-extern lzma_ret lzma_lzma_props_encode(const void *options, uint8_t *out);
-
-/// Encodes lc/lp/pb into one byte. Returns false on success and true on error.
-extern bool lzma_lzma_lclppb_encode(
-		const lzma_options_lzma *options, uint8_t *byte);
-
-#ifdef LZMA_LZ_ENCODER_H
-
-/// Initializes raw LZMA encoder; this is used by LZMA2.
-extern lzma_ret lzma_lzma_encoder_create(
-		void **coder_ptr, const lzma_allocator *allocator,
-		const lzma_options_lzma *options, lzma_lz_options *lz_options);
-
-/// Resets an already initialized LZMA encoder; this is used by LZMA2.
-extern lzma_ret lzma_lzma_encoder_reset(
-		lzma_lzma1_encoder *coder, const lzma_options_lzma *options);
-
-extern lzma_ret lzma_lzma_encode(lzma_lzma1_encoder *restrict coder,
-		lzma_mf *restrict mf, uint8_t *restrict out,
-		size_t *restrict out_pos, size_t out_size,
-		uint32_t read_limit);
-
-#endif
-
-#endif
-
-/*** End of inlined file: lzma_encoder.h ***/
 
 
 /*** Start of inlined file: lzma_encoder_private.h ***/

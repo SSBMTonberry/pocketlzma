@@ -20,12 +20,10 @@
 
 TEST_CASE( "Basic test", "[basic]" )
 {
-    std::set<uint32_t> s;
-    s.insert(34);
-    s.insert(12);
-    s.insert(93);
-    s.insert(34); //Should be ignored
-    s.insert(34); //Should be ignored
+    std::unique_ptr<plz::ICompressor> compressor {new plz::Lzma2Compressor()}; //The nasty C++11 way
+    std::vector<uint8_t> input {34, 32, 156, 4, 4, 4, 9};
+    std::vector<uint8_t> output;
+    plz::StatusCode status = compressor->compress(input, output);
 
-    REQUIRE(true);
+    REQUIRE(status == plz::StatusCode::Ok);
 }

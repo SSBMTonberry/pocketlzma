@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 11)
 include_directories(${PROJECT_SOURCE_DIR}/../external_libs/ ${PROJECT_SOURCE_DIR}/../src)
 
 add_executable(pocketlzma_tests tests_main.cpp)
-target_link_libraries(pocketlzma_tests pocketlzma)
+#target_link_libraries(pocketlzma_tests pocketlzma)
 #if(LINUX)
 #    message("LINUX!")
 #    target_link_libraries(pocketlzma_tests stdc++fs)

@@ -108,7 +108,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 #         src/external/lzma/liblzma/common/vli_decoder.c
 #         src/external/lzma/liblzma/common/vli_encoder.c
 #         src/external/lzma/liblzma/common/vli_size.c
-# 
+#
 #         src/external/lzma/liblzma/lzma/fastpos_table.c
 #         src/external/lzma/liblzma/lzma/fastpos_tablegen.c
 #         src/external/lzma/liblzma/lzma/lzma2_decoder.c
@@ -120,9 +120,9 @@ option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 #         src/external/lzma/liblzma/lzma/lzma_encoder_presets.c
 #         )
 
-set(SOURCE_FILES src/pocketlzma.h)
+set(SOURCE_FILES src/pocketlzma.h src/interfaces/IDecompressor.hpp src/interfaces/ICompressor.hpp src/pocketlzma_common.h src/main.cpp src/compress/Lzma2Compressor.hpp src/classes/Lzma2Coder.hpp src/classes/LzmaOptions.hpp)
 
 # Only activated for code completion, must be uncommented before release!
-add_library(pocketlzma ${SOURCE_FILES} ${LZMA_SOURCE_FILES})
+add_library(pocketlzma ${SOURCE_FILES} ${LZMA_SOURCE_FILES}) #dummy build
 
 add_subdirectory(tests)
