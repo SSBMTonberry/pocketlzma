@@ -1,1 +1,1 @@
-./amalgamate -w "*.hpp" ./../include/tileson.h ./../single_include/tileson.hpp
+./amalgamate -w "*.cpp;*.c;*.hpp;*.h" ./../src/external/lzma/lzma_c.h ./../src/external/lzma/lzma_c.hpp
