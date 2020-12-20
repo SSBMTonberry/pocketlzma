@@ -24,8 +24,8 @@ namespace plz
             /*! LZMA encoder */
             void *lzma;
 
-            /// LZMA options currently in use.
-            lzma_options_lzma opt_cur;
+            /*! LZMA options currently in use. */
+            LzmaOptions optCur;
 
             bool needProperties;
             bool needStateReset;

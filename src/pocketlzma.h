@@ -7,7 +7,8 @@
 
 #include "pocketlzma_common.h"
 
-#include "classes/Lzma2Coder.hpp"
+#include "common/LzmaOptions.hpp"
+#include "common/Lzma2Coder.hpp"
 
 #include "interfaces/ICompressor.hpp"
 #include "interfaces/IDecompressor.hpp"

@@ -201,5 +201,101 @@ namespace plz
         /*! Undefined error */
         UndefinedError = 999
     };
+
+    /*!
+     * Compression modes
+     *
+     * This selects the function used to analyze the data produced by the match
+     * finder.
+     */
+    enum class Mode
+    {
+        /*!
+         * Fast compression
+         *
+         * Fast mode is usually at its best when combined with
+         * a hash chain match finder.
+         */
+        Fast = 1,
+
+        /*!
+         * Normal compression
+		 *
+		 * This is usually notably slower than fast mode. Use this
+		 * together with binary tree match finders to expose the
+		 * full potential of the LZMA1 or LZMA2 encoder.
+         */
+        Normal = 2
+    };
+
+    /*!
+     *
+     * Match finder has major effect on both speed and compression ratio.
+     * Usually hash chains are faster than binary trees.
+     *
+     * If you will use LZMA_SYNC_FLUSH often, the hash chains may be a better
+     * choice, because binary trees get much higher compression ratio penalty
+     * with LZMA_SYNC_FLUSH.
+     *
+     * The memory usage formulas are only rough estimates, which are closest to
+     * reality when dict_size is a power of two. The formulas are  more complex
+     * in reality, and can also change a little between liblzma versions. Use
+     * lzma_raw_encoder_memusage() to get more accurate estimate of memory usage.
+     */
+    enum class MatchFinder
+    {
+        /*!
+         * Hash Chain with 2- and 3-byte hashing
+		 *
+		 * Minimum nice_len: 3
+		 *
+		 * Memory usage:
+		 *  - dict_size <= 16 MiB: dict_size * 7.5
+		 *  - dict_size > 16 MiB: dict_size * 5.5 + 64 MiB
+         */
+        HC3 = 0x03,
+
+        /*!
+         * Hash Chain with 2-, 3-, and 4-byte hashing
+		 *
+		 * Minimum nice_len: 4
+		 *
+		 * Memory usage:
+		 *  - dict_size <= 32 MiB: dict_size * 7.5
+		 *  - dict_size > 32 MiB: dict_size * 6.5
+         */
+        HC4 = 0x04,
+
+        /*!
+         * Binary Tree with 2-byte hashing
+		 *
+		 * Minimum nice_len: 2
+		 *
+		 * Memory usage: dict_size * 9.5
+         */
+        BT2 = 0x12,
+
+        /*!
+         * Binary Tree with 2- and 3-byte hashing
+		 *
+		 * Minimum nice_len: 3
+		 *
+		 * Memory usage:
+		 *  - dict_size <= 16 MiB: dict_size * 11.5
+		 *  - dict_size > 16 MiB: dict_size * 9.5 + 64 MiB
+         */
+        BT3 = 0x13,
+
+        /*!
+         * Binary Tree with 2-, 3-, and 4-byte hashing
+		 *
+		 * Minimum nice_len: 4
+		 *
+		 * Memory usage:
+		 *  - dict_size <= 32 MiB: dict_size * 11.5
+		 *  - dict_size > 32 MiB: dict_size * 10.5
+         */
+        BT4 = 0x14
+    };
 }
 #endif //POCKETLZMA_POCKETLZMA_COMMON_H
