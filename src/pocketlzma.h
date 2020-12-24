@@ -9,10 +9,12 @@
 
 #include "common/LzmaOptions.hpp"
 #include "common/Lzma2Coder.hpp"
+#include "common/CommonFunctions.hpp"
 
 #include "interfaces/ICompressor.hpp"
 #include "interfaces/IDecompressor.hpp"
 
+#include "compress/LzmaCompressor.hpp"
 #include "compress/Lzma2Compressor.hpp"
 
 

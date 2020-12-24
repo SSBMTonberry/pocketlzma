@@ -121,7 +121,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 #         )
 
 set(SOURCE_FILES src/pocketlzma.h src/interfaces/IDecompressor.hpp src/interfaces/ICompressor.hpp
-        src/pocketlzma_common.h src/main.cpp src/compress/Lzma2Compressor.hpp src/common/Lzma2Coder.hpp src/common/LzmaOptions.hpp)
+        src/pocketlzma_common.h src/main.cpp src/compress/Lzma2Compressor.hpp src/common/Lzma2Coder.hpp src/common/LzmaOptions.hpp src/compress/LzmaCompressor.hpp src/common/CommonFunctions.hpp)
 
 # Only activated for code completion, must be uncommented before release!
 add_library(pocketlzma ${SOURCE_FILES} ${LZMA_SOURCE_FILES}) #dummy build

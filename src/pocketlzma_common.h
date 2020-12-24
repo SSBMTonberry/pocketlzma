@@ -10,16 +10,29 @@
 
 namespace plz
 {
-    //Constants
-    const uint32_t LZMA2_MAX_BUFFER_SIZE {1 << 22};
-    const uint32_t LZMA2_MAX_CHUNK_SIZE {1 << 16};
-    const uint8_t LZMA2_MAX_HEADER_SIZE {6};
-    const uint8_t LZMA2_MAX_HEADER_SIZE_UNCOMPRESSED {3};
+    // C O N S T A N T S
+    // ---------------------
+
+    //LZMA/LZMA2
+    const uint32_t LZMA2_MAX_CHUNK_SIZE             {1 << 16};
+    const uint32_t LZMA2_MAX_UNCOMPRESSED_SIZE      {1 << 22};
+    const uint8_t LZMA2_MAX_HEADER_SIZE             {6};
+    const uint8_t LZMA2_HEADER_SIZE_UNCOMPRESSED    {3};
+
+    //LCLP (Literal Context / Literal Position)
+    const uint8_t LZMA_LCLP_MIN                     {0};
+    const uint8_t LZMA_LCLP_MAX                     {4};
+    const uint8_t LZMA_LC_DEFAULT                   {3};
+
+    //PB (Position Bits)
+    const uint8_t LZMA_PB_MIN                       {0};
+    const uint8_t LZMA_PB_MAX                       {4};
+    const uint8_t LZMA_PB_DEFAULT                   {2};
 
     /*!
      * Inspired by lzma_ret
      */
-    enum class StatusCode
+    enum class StatusCode : uint32_t
     {
         /*! All good! */
         Ok = 0,
@@ -197,6 +210,16 @@ namespace plz
 		 * how to report bugs.
          */
         ProgError = 11,
+
+        // P O C K E T L Z M A   S P E C I F I C
+        // ----------------------------------------
+        // 100-110 - Header/data validation
+        UncompressedSizeIsZero                  = 100,
+        UncompressedSizeTooLargeLzma2           = 101,
+        CompressedSizeIsZero                    = 102,
+        CompressedSizeIsLargerThanMaxChunkLzma2 = 103,
+        ErrorInLclppbCheckOnLzmaOptions         = 104,
+        InvalidLclppbByteValue                  = 105,
 
         /*! Undefined error */
         UndefinedError = 999
