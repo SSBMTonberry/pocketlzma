@@ -7,6 +7,8 @@
 
 #include "pocketlzma_common.h"
 
+#include "common/LzmaMatch.hpp"
+#include "common/LzmaMF.hpp"
 #include "common/LzmaOptions.hpp"
 #include "common/Lzma2Coder.hpp"
 #include "common/CommonFunctions.hpp"

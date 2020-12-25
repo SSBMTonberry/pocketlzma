@@ -320,5 +320,113 @@ namespace plz
          */
         BT4 = 0x14
     };
+
+    /*!
+     * The `action' argument for lzma_code()
+     *
+     * After the first use of LZMA_SYNC_FLUSH, LZMA_FULL_FLUSH, LZMA_FULL_BARRIER,
+     * or LZMA_FINISH, the same `action' must is used until lzma_code() returns
+     * LZMA_STREAM_END. Also, the amount of input (that is, strm->avail_in) must
+     * not be modified by the application until lzma_code() returns
+     * LZMA_STREAM_END. Changing the `action' or modifying the amount of input
+     * will make lzma_code() return LZMA_PROG_ERROR.
+     */
+    enum class LzmaAction
+    {
+        /*!
+         * Continue coding
+         *
+         * Encoder: Encode as much input as possible. Some internal
+         * buffering will probably be done (depends on the filter
+         * chain in use), which causes latency: the input used won't
+         * usually be decodeable from the output of the same
+         * lzma_code() call.
+         *
+         * Decoder: Decode as much input as possible and produce as
+         * much output as possible.
+         */
+        Run = 0,
+
+        /*!
+         * Make all the input available at output
+		 *
+		 * Normally the encoder introduces some latency.
+		 * LZMA_SYNC_FLUSH forces all the buffered data to be
+		 * available at output without resetting the internal
+		 * state of the encoder. This way it is possible to use
+		 * compressed stream for example for communication over
+		 * network.
+		 *
+		 * Only some filters support LZMA_SYNC_FLUSH. Trying to use
+		 * LZMA_SYNC_FLUSH with filters that don't support it will
+		 * make lzma_code() return LZMA_OPTIONS_ERROR. For example,
+		 * LZMA1 doesn't support LZMA_SYNC_FLUSH but LZMA2 does.
+		 *
+		 * Using LZMA_SYNC_FLUSH very often can dramatically reduce
+		 * the compression ratio. With some filters (for example,
+		 * LZMA2), fine-tuning the compression options may help
+		 * mitigate this problem significantly (for example,
+		 * match finder with LZMA2).
+		 *
+		 * Decoders don't support LZMA_SYNC_FLUSH.
+         */
+        SyncFlush = 1,
+
+        /*!
+         * Finish encoding of the current Block
+		 *
+		 * All the input data going to the current Block must have
+		 * been given to the encoder (the last bytes can still be
+		 * pending in *next_in). Call lzma_code() with LZMA_FULL_FLUSH
+		 * until it returns LZMA_STREAM_END. Then continue normally
+		 * with LZMA_RUN or finish the Stream with LZMA_FINISH.
+		 *
+		 * This action is currently supported only by Stream encoder
+		 * and easy encoder (which uses Stream encoder). If there is
+		 * no unfinished Block, no empty Block is created.
+         */
+        FullFlush = 2,
+
+        /*!
+         * Finish encoding of the current Block
+		 *
+		 * This is like LZMA_FULL_FLUSH except that this doesn't
+		 * necessarily wait until all the input has been made
+		 * available via the output buffer. That is, lzma_code()
+		 * might return LZMA_STREAM_END as soon as all the input
+		 * has been consumed (avail_in == 0).
+		 *
+		 * LZMA_FULL_BARRIER is useful with a threaded encoder if
+		 * one wants to split the .xz Stream into Blocks at specific
+		 * offsets but doesn't care if the output isn't flushed
+		 * immediately. Using LZMA_FULL_BARRIER allows keeping
+		 * the threads busy while LZMA_FULL_FLUSH would make
+		 * lzma_code() wait until all the threads have finished
+		 * until more data could be passed to the encoder.
+		 *
+		 * With a lzma_stream initialized with the single-threaded
+		 * lzma_stream_encoder() or lzma_easy_encoder(),
+		 * LZMA_FULL_BARRIER is an alias for LZMA_FULL_FLUSH.
+         */
+        FullBarrier = 4,
+
+        /*!
+         * Finish the coding operation
+		 *
+		 * All the input data must have been given to the encoder
+		 * (the last bytes can still be pending in next_in).
+		 * Call lzma_code() with LZMA_FINISH until it returns
+		 * LZMA_STREAM_END. Once LZMA_FINISH has been used,
+		 * the amount of input must no longer be changed by
+		 * the application.
+		 *
+		 * When decoding, using LZMA_FINISH is optional unless the
+		 * LZMA_CONCATENATED flag was used when the decoder was
+		 * initialized. When LZMA_CONCATENATED was not used, the only
+		 * effect of LZMA_FINISH is that the amount of input must not
+		 * be changed just like in the encoder.
+         */
+        Finish = 3
+    };
 }
 #endif //POCKETLZMA_POCKETLZMA_COMMON_H

@@ -15,12 +15,13 @@ namespace plz
             enum class Sequence : uint8_t
             {
                 Init = 0,
-                LzmaEncode = 1,
-                LzmaCopy = 2,
+                Encode = 1,
+                Copy = 2,
                 UncompressedHeader = 3,
                 UncompressedCopy = 4
             };
 
+            Sequence sequence {Sequence::Init};
             /*! LZMA encoder */
             void *lzma;
 
