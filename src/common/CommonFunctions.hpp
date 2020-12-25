@@ -16,6 +16,20 @@ namespace plz
 
         return StatusCode::ErrorInLclppbCheckOnLzmaOptions;
     }
+
+    /*! Get the number of bytes that haven't been encoded yet (some of these
+     *  bytes may have been ran through the match finder though).
+     */
+    static inline uint32_t MfUnencoded(const LzmaMF *mf)
+    {
+        return mf->writePos - mf->readPos + mf->readAhead;
+    }
+
+    // Macro to get the index of the appropriate probability array.
+    // #define get_dist_state(len) \
+    //     ((len) < DIST_STATES + MATCH_LEN_MIN \
+    //         ? (len) - MATCH_LEN_MIN \
+    //         : DIST_STATES - 1)
 }
 
 #endif //POCKETLZMA_COMMONFUNCTIONS_HPP

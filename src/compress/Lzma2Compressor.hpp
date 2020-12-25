@@ -99,7 +99,7 @@ namespace plz
                 case Lzma2Coder::Sequence::Init:
                     // If there's no input left and we are flushing or finishing,
                     // don't start a new chunk.
-                    if (mf_unencoded(mf) == 0)
+                    if (MfUnencoded(mf) == 0)
                     {
                         // Write end of payload marker if finishing.
                         if (mf->action == LzmaAction::Finish)

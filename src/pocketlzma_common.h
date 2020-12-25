@@ -10,6 +10,30 @@
 
 namespace plz
 {
+    // T Y P E D E F S
+    // ---------------------
+
+    /*! Type of probabilities used with range coder
+     *
+     *  This needs to be at least 12-bit integer, so uint16_t is a logical choice.
+     *  However, on some architecture and compiler combinations, a bigger type
+     *  may give better speed, because the probability variables are accessed
+     *  a lot. On the other hand, bigger probability type increases cache
+     *  footprint, since there are 2 to 14 thousand probability variables in
+     *  LZMA (assuming the limit of lc + lp <= 4; with lc + lp <= 12 there
+     *  would be about 1.5 million variables).
+     *
+     *  With malicious files, the initialization speed of the LZMA decoder can
+     *  become important. In that case, smaller probability variables mean that
+     *  there is less bytes to write to RAM, which makes initialization faster.
+     *  With big probability type, the initialization can become so slow that it
+     *  can be a problem e.g. for email servers doing virus scanning.
+     *
+     *  I will be sticking to uint16_t unless some specific architectures
+     *  are *much* faster (20-50 %) with uint32_t.
+     */
+    typedef uint16_t probability;
+
     // C O N S T A N T S
     // ---------------------
 
@@ -28,6 +52,99 @@ namespace plz
     const uint8_t LZMA_PB_MIN                       {0};
     const uint8_t LZMA_PB_MAX                       {4};
     const uint8_t LZMA_PB_DEFAULT                   {2};
+
+    const uint8_t REPS                              {4};
+
+    //vMatch length
+    // Minimum length of a match is two bytes.
+    const uint8_t MATCH_LEN_MIN                     {2};
+
+    // Match length is encoded with 4, 5, or 10 bits.
+    //
+    // Length   Bits
+    //  2-9      4 = Choice=0 + 3 bits
+    // 10-17     5 = Choice=1 + Choice2=0 + 3 bits
+    // 18-273   10 = Choice=1 + Choice2=1 + 8 bits
+    const uint8_t LEN_LOW_BITS                          {3};
+    const uint8_t LEN_LOW_SYMBOLS                       {1 << LEN_LOW_BITS};
+    const uint8_t LEN_MID_BITS                          {3};
+    const uint8_t LEN_MID_SYMBOLS                       {1 << LEN_MID_BITS};
+    const uint8_t LEN_HIGH_BITS                         {8};
+    const uint16_t LEN_HIGH_SYMBOLS                     {1 << LEN_HIGH_BITS};
+    const uint16_t LEN_SYMBOLS                          {LEN_LOW_SYMBOLS + LEN_MID_SYMBOLS + LEN_HIGH_SYMBOLS};
+
+    // Maximum length of a match is 273 which is a result of the encoding
+    // described above.
+    const uint16_t MATCH_LEN_MAX                        {MATCH_LEN_MIN + LEN_SYMBOLS - 1};
+
+    /// Each literal coder is divided in three sections:
+    ///   - 0x001-0x0FF: Without match byte
+    ///   - 0x101-0x1FF: With match byte; match bit is 0
+    ///   - 0x201-0x2FF: With match byte; match bit is 1
+    ///
+    /// Match byte is used when the previous LZMA symbol was something else than
+    /// a literal (that is, it was some kind of match).
+    const uint16_t LITERAL_CODER_SIZE                   {0x300};
+
+    /// Maximum number of literal coders
+    const uint16_t LITERAL_CODERS_MAX                   {1 << LZMA_LCLP_MAX};
+
+    /// Total number of states
+    const uint8_t STATES                                {12};
+
+    /// Maximum number of position states. A position state is the lowest pos bits
+    /// number of bits of the current uncompressed offset. In some places there
+    /// are different sets of probabilities for different pos states.
+    const uint16_t  POS_STATES_MAX                      {1 << LZMA_PB_MAX};
+
+    ////////////////////
+    // Match distance //
+    ////////////////////
+
+    // Different sets of probabilities are used for match distances that have very
+    // short match length: Lengths of 2, 3, and 4 bytes have a separate set of
+    // probabilities for each length. The matches with longer length use a shared
+    // set of probabilities.
+    const uint8_t DIST_STATES                           {4};
+
+
+
+    // The highest two bits of a match distance (distance slot) are encoded
+    // using six bits. See fastpos.h for more explanation.
+    const uint8_t DIST_SLOT_BITS                        {6};
+    const uint16_t DIST_SLOTS                           {1 << DIST_SLOT_BITS};
+
+    // Match distances up to 127 are fully encoded using probabilities. Since
+    // the highest two bits (distance slot) are always encoded using six bits,
+    // the distances 0-3 don't need any additional bits to encode, since the
+    // distance slot itself is the same as the actual distance. DIST_MODEL_START
+    // indicates the first distance slot where at least one additional bit is
+    // needed.
+    const uint8_t DIST_MODEL_START                      {4};
+
+    // Match distances greater than 127 are encoded in three pieces:
+    //   - distance slot: the highest two bits
+    //   - direct bits: 2-26 bits below the highest two bits
+    //   - alignment bits: four lowest bits
+    //
+    // Direct bits don't use any probabilities.
+    //
+    // The distance slot value of 14 is for distances 128-191 (see the table in
+    // fastpos.h to understand why).
+    const uint8_t DIST_MODEL_END                        {14};
+
+    // Distance slots that indicate a distance <= 127.
+    const uint8_t FULL_DISTANCES_BITS                   {DIST_MODEL_END / 2};
+    const uint16_t FULL_DISTANCES                       {1 << FULL_DISTANCES_BITS};
+
+    // For match distances greater than 127, only the highest two bits and the
+    // lowest four bits (alignment) is encoded using probabilities.
+    const uint8_t ALIGN_BITS                            {4};
+    const uint8_t ALIGN_SIZE                            {1 << ALIGN_BITS};
+    const uint8_t ALIGN_MASK                            {ALIGN_SIZE - 1};
+
+    // Optimal - Number of entries in the optimum array.
+    const uint16_t OPTS                                 {1 << 12};
 
     /*!
      * Inspired by lzma_ret
@@ -428,5 +545,33 @@ namespace plz
          */
         Finish = 3
     };
+
+    /*! This enum is used to track which events have occurred most recently and
+     *  in which order. This information is used to predict the next event.
+     *
+     *  Events:
+     *   - Literal: One 8-bit byte
+     *   - Match: Repeat a chunk of data at some distance
+     *   - Long repeat: Multi-byte match at a recently seen distance
+     *   - Short repeat: One-byte repeat at a recently seen distance
+     *
+     *  The event names are in from STATE_oldest_older_previous. REP means
+     *  either short or long repeated match, and NONLIT means any non-literal.
+     */
+     enum class LzmaState
+     {
+         LitLit,
+         MatchLitLit,
+         RepLitLit,
+         ShortRepLitLit,
+         MatchLit,
+         RepLit,
+         ShortRepLit,
+         LitMatch,
+         LitLongRep,
+         LitShortRep,
+         NonLitMatch,
+         NonLitRep
+     };
 }
 #endif //POCKETLZMA_POCKETLZMA_COMMON_H
