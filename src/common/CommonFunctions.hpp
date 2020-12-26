@@ -7,29 +7,19 @@
 
 namespace plz
 {
-    static inline StatusCode IsLclppbValid(const LzmaOptions *options)
-    {
-        if(options->lc <= LZMA_LCLP_MAX && options->lp <= LZMA_LCLP_MAX
-           && options->lc + options->lp <= LZMA_LCLP_MAX
-           && options->pb <= LZMA_PB_MAX)
-            return StatusCode::Ok;
 
-        return StatusCode::ErrorInLclppbCheckOnLzmaOptions;
+    /*! Resets the probability so that both 0 and 1 have probability of 50 % */
+    static inline void BitReset(probability &prob)
+    {
+        prob = RC_BIT_MODEL_TOTAL >> 1;
     }
 
-    /*! Get the number of bytes that haven't been encoded yet (some of these
-     *  bytes may have been ran through the match finder though).
-     */
-    static inline uint32_t MfUnencoded(const LzmaMF *mf)
+    /*! This does the same for a complete bit tree. (A tree represented as an array.) */
+    static inline void BittreeReset(probability *probs, uint32_t bit_levels)
     {
-        return mf->writePos - mf->readPos + mf->readAhead;
+        for (uint32_t bt_i = 0; bt_i < (1 << (bit_levels)); ++bt_i)
+		    BitReset((probs)[bt_i]);
     }
-
-    // Macro to get the index of the appropriate probability array.
-    // #define get_dist_state(len) \
-    //     ((len) < DIST_STATES + MATCH_LEN_MIN \
-    //         ? (len) - MATCH_LEN_MIN \
-    //         : DIST_STATES - 1)
 }
 
 #endif //POCKETLZMA_COMMONFUNCTIONS_HPP

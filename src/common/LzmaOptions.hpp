@@ -212,7 +212,20 @@ namespace plz
              * dramatically, possibly creating a denial of service attack.
              */
             uint32_t depth;
+
+            inline bool isLclppbValid() const;
      };
+
+    bool LzmaOptions::isLclppbValid() const
+    {
+        if(lc <= LZMA_LCLP_MAX && lp <= LZMA_LCLP_MAX
+           && lc + lp <= LZMA_LCLP_MAX
+           && pb <= LZMA_PB_MAX)
+            return true;
+
+        return false;
+        //return StatusCode::ErrorInLclppbCheckOnLzmaOptions;
+    }
 }
 
 #endif //POCKETLZMA_LZMAOPTIONS_HPP

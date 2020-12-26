@@ -146,6 +146,15 @@ namespace plz
     // Optimal - Number of entries in the optimum array.
     const uint16_t OPTS                                 {1 << 12};
 
+    //RangeEncoder (RC)
+
+    const uint8_t RC_SHIFT_BITS                         {8};
+    const uint8_t RC_TOP_BITS                           {24};
+    const uint32_t RC_TOP_VALUE                         {1 << RC_TOP_BITS};
+    const uint8_t RC_BIT_MODEL_TOTAL_BITS               {11};
+    const uint32_t RC_BIT_MODEL_TOTAL                   {1 << RC_BIT_MODEL_TOTAL_BITS};
+    const uint8_t RC_MOVE_BITS                          {5};
+
     /*!
      * Inspired by lzma_ret
      */
@@ -337,6 +346,9 @@ namespace plz
         CompressedSizeIsLargerThanMaxChunkLzma2 = 103,
         ErrorInLclppbCheckOnLzmaOptions         = 104,
         InvalidLclppbByteValue                  = 105,
+
+        // 200 - LZMA1 Encoding
+        LzmaEncodingLiteralInitError            = 200,
 
         /*! Undefined error */
         UndefinedError = 999

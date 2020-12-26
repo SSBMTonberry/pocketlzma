@@ -108,7 +108,17 @@ namespace plz
 
             /// Number of elements in son[]
             uint32_t sonsCount;
+
+            /*! Get the number of bytes that haven't been encoded yet (some of these
+             *  bytes may have been ran through the match finder though).
+             */
+            inline uint32_t mfUnencoded() const;
     };
+
+    uint32_t LzmaMF::mfUnencoded() const
+    {
+        return writePos - readPos + readAhead;
+    }
 }
 
 #endif //POCKETLZMA_LZMAMF_HPP

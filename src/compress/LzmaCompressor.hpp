@@ -18,6 +18,7 @@ namespace plz
             inline StatusCode lzmaLclppbEncode(const LzmaOptions *options, uint8_t *byte);
             inline StatusCode lzmaEncoderReset(Lzma1Encoder *coder, const LzmaOptions *options);
             inline bool isOptionsValid(const LzmaOptions *options);
+            inline StatusCode literalInit(probability (*probs)[LITERAL_CODER_SIZE], uint32_t lc, uint32_t lp);
     };
 
     StatusCode LzmaCompressor::compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output)
@@ -27,7 +28,7 @@ namespace plz
 
     StatusCode LzmaCompressor::lzmaLclppbEncode(const LzmaOptions *options, uint8_t *byte)
     {
-        StatusCode lclppbStatus = IsLclppbValid(options);
+        StatusCode lclppbStatus = options->isLclppbValid() ? StatusCode::Ok : StatusCode::ErrorInLclppbCheckOnLzmaOptions;
         if (lclppbStatus != StatusCode::Ok)
             return lclppbStatus;
 
@@ -51,40 +52,44 @@ namespace plz
         coder->rc.reset();
 
         // State
-        coder->state = STATE_LIT_LIT;
+        coder->state = LzmaState::LitLit;
         for (size_t i = 0; i < REPS; ++i)
             coder->reps[i] = 0;
 
-        literal_init(coder->literal, options->lc, options->lp);
+        StatusCode initStatus = literalInit(coder->literal, options->lc, options->lp);
+        if(initStatus != StatusCode::Ok)
+            return initStatus;
 
         // Bit encoders
         for (size_t i = 0; i < STATES; ++i) {
-            for (size_t j = 0; j <= coder->pos_mask; ++j) {
-                bit_reset(coder->is_match[i][j]);
-                bit_reset(coder->is_rep0_long[i][j]);
+            for (size_t j = 0; j <= coder->posMask; ++j) {
+                BitReset(coder->isMatch[i][j]);
+                BitReset(coder->isRep0Long[i][j]);
             }
 
-            bit_reset(coder->is_rep[i]);
-            bit_reset(coder->is_rep0[i]);
-            bit_reset(coder->is_rep1[i]);
-            bit_reset(coder->is_rep2[i]);
+            BitReset(coder->isRep[i]);
+            BitReset(coder->isRep0[i]);
+            BitReset(coder->isRep1[i]);
+            BitReset(coder->isRep2[i]);
         }
 
         for (size_t i = 0; i < FULL_DISTANCES - DIST_MODEL_END; ++i)
-            bit_reset(coder->dist_special[i]);
+            BitReset(coder->distSpecial[i]);
 
         // Bit tree encoders
         for (size_t i = 0; i < DIST_STATES; ++i)
-            bittree_reset(coder->dist_slot[i], DIST_SLOT_BITS);
+            BittreeReset(coder->distSlot[i], DIST_SLOT_BITS);
 
-        bittree_reset(coder->dist_align, ALIGN_BITS);
+        BittreeReset(coder->distAlign, ALIGN_BITS);
 
         // Length encoders
-        length_encoder_reset(&coder->match_len_encoder,
-                             1U << options->pb, coder->fast_mode);
-
-        length_encoder_reset(&coder->rep_len_encoder,
-                             1U << options->pb, coder->fast_mode);
+        coder->matchLenEncoder.reset(1U << options->pb, coder->fastMode);
+        coder->repLenEncoder.reset(1U << options->pb, coder->fastMode);
+        // length_encoder_reset(&coder->matchLenEncoder,
+        //                      1U << options->pb, coder->fastMode);
+//
+        // length_encoder_reset(&coder->repLenEncoder,
+        //                      1U << options->pb, coder->fastMode);
 
         // Price counts are incremented every time appropriate probabilities
         // are changed. price counts are set to zero when the price tables
@@ -111,11 +116,25 @@ namespace plz
     {
         // Validate some of the options. LZ encoder validates nice_len too
         // but we need a valid value here earlier.
-        return IsLclppbValid(options) == StatusCode::Ok
+        return options->isLclppbValid()
                && options->niceLen >= MATCH_LEN_MIN
                && options->niceLen <= MATCH_LEN_MAX
                && (options->mode == Mode::Fast
                    || options->mode == Mode::Normal);
+    }
+
+    StatusCode LzmaCompressor::literalInit(probability (*probs)[LITERAL_CODER_SIZE], uint32_t lc, uint32_t lp)
+    {
+        if(lc + lp > LZMA_LCLP_MAX)
+            return StatusCode::LzmaEncodingLiteralInitError;
+
+        const uint32_t coders = 1U << (lc + lp);
+
+        for (uint32_t i = 0; i < coders; ++i)
+            for (uint32_t j = 0; j < LITERAL_CODER_SIZE; ++j)
+                BitReset(probs[i][j]);
+
+        return StatusCode::Ok;
     }
 }
 #endif //POCKETLZMA_LZMACOMPRESSOR_HPP

@@ -7,15 +7,18 @@
 
 #include "pocketlzma_common.h"
 
+#include "common/CommonFunctions.hpp"
+#include "common/Price.hpp"
+
 #include "common/RangeEncoder.hpp"
 #include "common/LzmaMatch.hpp"
 #include "common/LzmaMF.hpp"
 #include "common/LzmaOptions.hpp"
-#include "common/LengthEncoder.hpp"
 #include "common/LzmaOptimal.hpp"
+#include "common/LengthEncoder.hpp"
+
 #include "common/Lzma1Encoder.hpp"
 #include "common/Lzma2Coder.hpp"
-#include "common/CommonFunctions.hpp"
 
 #include "interfaces/ICompressor.hpp"
 #include "interfaces/IDecompressor.hpp"
