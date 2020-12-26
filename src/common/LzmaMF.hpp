@@ -112,12 +112,127 @@ namespace plz
             /*! Get the number of bytes that haven't been encoded yet (some of these
              *  bytes may have been ran through the match finder though).
              */
-            inline uint32_t mfUnencoded() const;
+            inline uint32_t unencoded() const;
+
+            /*!
+             *   mf_position.
+             *   Calculate the absolute offset from the beginning of the most recent
+             *   dictionary reset. Only the lowest four bits are important, so there's no
+             *   problem that we don't know the 64-bit size of the data encoded so far.
+             *
+             *   NOTE: When moving the input window, we need to do it so that the lowest
+             *   bits of dict->read_pos are not modified to keep this macro working
+             *   as intended.
+             */
+            inline uint32_t position();
+
+            /*!
+             * mf_skip.
+             *
+             * Skip the given number of bytes. This is used when a good match was found.
+             * For example, if mf_find() finds a match of 200 bytes long, the first byte
+             * of that match was already consumed by mf_find(), and the rest 199 bytes
+             * have to be skipped with mf_skip(mf, 199).
+             */
+            inline void mfSkip(uint32_t amount);
+
+            /*! lzma_mf_find / mf_find
+             * Find matches starting from the current byte
+             * \return The length of the longest match found*/
+            inline uint32_t mfFind(uint32_t *count_ptr, LzmaMatch *matches);
+
+            /*! mf_ptr.
+             * Get pointer to the first byte not ran through the match finder */
+            inline const uint8_t *ptr();
+
+            /*! mf_avail */
+            inline uint32_t avail();
     };
 
-    uint32_t LzmaMF::mfUnencoded() const
+    uint32_t LzmaMF::unencoded() const
     {
         return writePos - readPos + readAhead;
+    }
+
+    uint32_t LzmaMF::position()
+    {
+        return readPos - readAhead;
+    }
+
+    void LzmaMF::mfSkip(uint32_t amount)
+    {
+        if (amount != 0)
+        {
+            skip(this, amount);
+            readAhead += amount;
+        }
+    }
+
+    uint32_t LzmaMF::mfFind(uint32_t *count_ptr, LzmaMatch *matches)
+    {
+        // Call the match finder. It returns the number of length-distance
+        // pairs found.
+        // FIXME: Minimum count is zero, what _exactly_ is the maximum?
+        const uint32_t count = find(this, matches);
+
+        // Length of the longest match; assume that no matches were found
+        // and thus the maximum length is zero.
+        uint32_t len_best = 0;
+
+        if (count > 0) {
+            #ifndef NDEBUG
+                // Validate the matches.
+                for (uint32_t i = 0; i < count; ++i) {
+                    assert(matches[i].len <= niceLen);
+                    assert(matches[i].dist < readPos);
+                    assert(memcmp(ptr() - 1, ptr() - matches[i].dist - 2, matches[i].len) == 0);
+                }
+            #endif
+
+            // The last used element in the array contains
+            // the longest match.
+            len_best = matches[count - 1].len;
+
+            // If a match of maximum search length was found, try to
+            // extend the match to maximum possible length.
+            if (len_best == niceLen) {
+                // The limit for the match length is either the
+                // maximum match length supported by the LZ-based
+                // encoder or the number of bytes left in the
+                // dictionary, whichever is smaller.
+                uint32_t limit = avail() + 1;
+                if (limit > matchLenMax)
+                    limit = matchLenMax;
+
+                // Pointer to the byte we just ran through
+                // the match finder.
+                const uint8_t *p1 = ptr() - 1;
+
+                // Pointer to the beginning of the match. We need -1
+                // here because the match distances are zero based.
+                const uint8_t *p2 = p1 - matches[count - 1].dist - 1;
+
+                len_best = LzmaMemcmplen(p1, p2, len_best, limit);
+            }
+        }
+
+        *count_ptr = count;
+
+        // Finally update the read position to indicate that match finder was
+        // run for this dictionary offset.
+        ++readAhead;
+
+        return len_best;
+    }
+
+    const uint8_t *LzmaMF::ptr()
+    {
+        return buffer + readPos;
+    }
+
+    uint32_t LzmaMF::avail()
+    {
+        return writePos - readPos;
     }
 }
 

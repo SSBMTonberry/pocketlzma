@@ -14,6 +14,13 @@ namespace plz
             inline StatusCode compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output) override;
 
         protected:
+            inline StatusCode encode(Lzma1Encoder *coder, LzmaMF *mf,
+                                     uint8_t *out, size_t *out_pos,
+                                     size_t out_size);
+            inline StatusCode lzmaEncode(Lzma1Encoder * coder, LzmaMF * mf,
+                             uint8_t * out, size_t * out_pos,
+                             size_t out_size, uint32_t limit);
+
             /*! Encodes lc/lp/pb into one byte. */
             inline StatusCode lzmaLclppbEncode(const LzmaOptions *options, uint8_t *byte);
             inline StatusCode lzmaEncoderReset(Lzma1Encoder *coder, const LzmaOptions *options);
@@ -23,7 +30,107 @@ namespace plz
 
     StatusCode LzmaCompressor::compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output)
     {
+
         return StatusCode::UndefinedError;
+    }
+
+    StatusCode LzmaCompressor::encode(Lzma1Encoder *coder, LzmaMF *mf, uint8_t *out, size_t *out_pos, size_t out_size)
+    {
+        // Plain LZMA has no support for sync-flushing.
+        if (unlikely(mf->action == LzmaAction::SyncFlush))
+            return StatusCode::OptionsError;
+        return lzmaEncode(coder, mf, out, out_pos, out_size, UINT32_MAX);
+    }
+
+    StatusCode LzmaCompressor::lzmaEncode(Lzma1Encoder *coder, LzmaMF *mf, uint8_t *out, size_t *out_pos, size_t out_size, uint32_t limit)
+    {
+        // Initialize the stream if no data has been encoded yet.
+        if (!coder->isInitialized && !coder->init(mf))
+            return StatusCode::Ok;
+
+        // Get the lowest bits of the uncompressed offset from the LZ layer.
+        uint32_t position = mf->position();
+
+        while (true) {
+            // Encode pending bits, if any. Calling this before encoding
+            // the next symbol is needed only with plain LZMA, since
+            // LZMA2 always provides big enough buffer to flush
+            // everything out from the range encoder. For the same reason,
+            // rc_encode() never returns true when this function is used
+            // as part of LZMA2 encoder.
+            if (coder->rc.encode(out, out_pos, out_size))
+            {
+                assert(limit == UINT32_MAX);
+                return StatusCode::Ok;
+            }
+
+            // With LZMA2 we need to take care that compressed size of
+            // a chunk doesn't get too big.
+            // FIXME? Check if this could be improved.
+            if (limit != UINT32_MAX
+                && (mf->readPos - mf->readAhead >= limit ||
+                    *out_pos + coder->rc.pending() >= LZMA2_MAX_CHUNK_SIZE - LOOP_INPUT_MAX))
+            {
+                break;
+            }
+
+            // Check that there is some input to process.
+            if (mf->readPos >= mf->readLimit)
+            {
+                if (mf->action == LzmaAction::Run)
+                    return StatusCode::Ok;
+
+                if (mf->readAhead == 0)
+                    break;
+            }
+
+            // Get optimal match (repeat position and length).
+            // Value ranges for pos:
+            //   - [0, REPS): repeated match
+            //   - [REPS, UINT32_MAX):
+            //     match at (pos - REPS)
+            //   - UINT32_MAX: not a match but a literal
+            // Value ranges for len:
+            //   - [MATCH_LEN_MIN, MATCH_LEN_MAX]
+            uint32_t len;
+            uint32_t back;
+
+            if (coder->fastMode)
+                lzma_lzma_optimum_fast(coder, mf, &back, &len);
+            else
+                lzma_lzma_optimum_normal(
+                        coder, mf, &back, &len, position);
+
+            encode_symbol(coder, mf, back, len, position);
+
+            position += len;
+        }
+
+        if (!coder->is_flushed) {
+            coder->is_flushed = true;
+
+            // We don't support encoding plain LZMA streams without EOPM,
+            // and LZMA2 doesn't use EOPM at LZMA level.
+            if (limit == UINT32_MAX)
+                encode_eopm(coder, position);
+
+            // Flush the remaining bytes from the range encoder.
+            rc_flush(&coder->rc);
+
+            // Copy the remaining bytes to the output buffer. If there
+            // isn't enough output space, we will copy out the remaining
+            // bytes on the next call to this function by using
+            // the rc_encode() call in the encoding loop above.
+            if (rc_encode(&coder->rc, out, out_pos, out_size)) {
+                assert(limit == UINT32_MAX);
+                return LZMA_OK;
+            }
+        }
+
+        // Make it ready for the next LZMA2 chunk.
+        coder->is_flushed = false;
+
+        return StatusCode::StreamEnd;
     }
 
     StatusCode LzmaCompressor::lzmaLclppbEncode(const LzmaOptions *options, uint8_t *byte)
@@ -136,5 +243,9 @@ namespace plz
 
         return StatusCode::Ok;
     }
+
+
+
+
 }
 #endif //POCKETLZMA_LZMACOMPRESSOR_HPP

@@ -92,6 +92,9 @@ namespace plz
     /// Total number of states
     const uint8_t STATES                                {12};
 
+    /// The lowest 7 states indicate that the previous state was a literal.
+    const uint8_t LIT_STATES                            {7};
+
     /// Maximum number of position states. A position state is the lowest pos bits
     /// number of bits of the current uncompressed offset. In some places there
     /// are different sets of probabilities for different pos states.
@@ -154,6 +157,14 @@ namespace plz
     const uint8_t RC_BIT_MODEL_TOTAL_BITS               {11};
     const uint32_t RC_BIT_MODEL_TOTAL                   {1 << RC_BIT_MODEL_TOTAL_BITS};
     const uint8_t RC_MOVE_BITS                          {5};
+
+    /*! Number of bytes that a single encoding loop in lzma_lzma_encode() can
+     *  consume from the dictionary. This limit comes from lzma_lzma_optimum()
+     *  and may need to be updated if that function is significantly modified.
+     */
+    const uint16_t LOOP_INPUT_MAX                      {OPTS + 1};
+
+    const uint8_t FASTPOS_BITS                         {13};
 
     /*!
      * Inspired by lzma_ret
