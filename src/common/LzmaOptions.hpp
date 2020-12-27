@@ -214,6 +214,9 @@ namespace plz
             uint32_t depth;
 
             inline bool isLclppbValid() const;
+
+            /*! is_options_valid */
+            inline bool isValid() const;
      };
 
     bool LzmaOptions::isLclppbValid() const
@@ -225,6 +228,16 @@ namespace plz
 
         return false;
         //return StatusCode::ErrorInLclppbCheckOnLzmaOptions;
+    }
+
+    bool LzmaOptions::isValid() const
+    {
+        // Validate some of the options. LZ encoder validates nice_len too
+        // but we need a valid value here earlier.
+        return isLclppbValid()
+               && niceLen >= MATCH_LEN_MIN
+               && niceLen <= MATCH_LEN_MAX
+               && (mode == Mode::Fast || mode == Mode::Normal);
     }
 }
 

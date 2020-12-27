@@ -83,6 +83,18 @@ namespace plz
         ((probs)[(((pos) & (lp_mask)) << (lc)) \
                 + ((uint32_t)(prev_byte) >> (8U - (lc)))])
 
+    /// \brief      Return if expression doesn't evaluate to LZMA_OK
+    ///
+    /// There are several situations where we want to return immediately
+    /// with the value of expr if it isn't LZMA_OK. This macro shortens
+    /// the code a little.
+    #define return_if_error(expr) \
+    do { \
+        const StatusCode ret_ = (expr); \
+        if (ret_ != StatusCode::Ok) \
+            return ret_; \
+    } while (0)
+
     /// Indicate that the latest state was a literal.
     //#define update_literal(state) \
     //    state = ((state) <= STATE_SHORTREP_LIT_LIT \
@@ -90,6 +102,8 @@ namespace plz
     //            : ((state) <= STATE_LIT_SHORTREP \
     //                ? (state) - 3 \
     //                : (state) - 6))
+
+
 
     /*! Based on the update_literal macro.
      * Indicate that the latest state was a literal.
@@ -145,6 +159,20 @@ namespace plz
     {
         for (uint32_t bt_i = 0; bt_i < (1 << (bit_levels)); ++bt_i)
 		    BitReset((probs)[bt_i]);
+    }
+
+    static inline void LiteralInit(probability (*probs)[LITERAL_CODER_SIZE],
+                                   uint32_t lc, uint32_t lp)
+    {
+        assert(lc + lp <= LZMA_LCLP_MAX);
+
+        const uint32_t coders = 1U << (lc + lp);
+
+        for (uint32_t i = 0; i < coders; ++i)
+            for (uint32_t j = 0; j < LITERAL_CODER_SIZE; ++j)
+                BitReset(probs[i][j]);
+
+        return;
     }
 
     /*! Find out how many equal bytes the two buffers have.

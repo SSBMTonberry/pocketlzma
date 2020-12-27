@@ -109,8 +109,7 @@ namespace plz
                     }
 
                     if (coder->needStateReset)
-                        return_if_error(lzma_lzma_encoder_reset(
-                                coder->lzma, &coder->optCur));
+                        return_if_error(coder->lzma->reset(&coder->optCur));
 
                     coder->uncompressedSize = 0;
                     coder->compressedSize = 0;
@@ -146,7 +145,7 @@ namespace plz
                     const uint32_t read_start = mf->readPos - mf->readAhead;
 
                     // Call the LZMA encoder until the chunk is finished.
-                    const StatusCode ret = lzma_lzma_encode(coder->lzma, mf,
+                    const StatusCode ret = LzmaCompressor::lzmaEncode(coder->lzma.get(), mf,
                                                           coder->buf + LZMA2_MAX_HEADER_SIZE,
                                                           &coder->compressedSize,
                                                           LZMA2_MAX_CHUNK_SIZE, limit);
@@ -177,7 +176,7 @@ namespace plz
 
                     // The chunk did compress at least by one byte, so we store
                     // the chunk as LZMA.
-                    lzma2_header_lzma(coder);
+                    validateCoderAndAssignHeader(coder); // lzma2_header_lzma(coder);
 
                     coder->sequence = Lzma2Coder::Sequence::Copy;
                 }

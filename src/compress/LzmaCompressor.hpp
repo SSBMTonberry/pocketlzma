@@ -113,7 +113,7 @@ namespace plz
             // We don't support encoding plain LZMA streams without EOPM,
             // and LZMA2 doesn't use EOPM at LZMA level.
             if (limit == UINT32_MAX)
-                encode_eopm(coder, position);
+                coder->encodeEopm(position);
 
             // Flush the remaining bytes from the range encoder.
             coder->rc.flush();
@@ -213,11 +213,11 @@ namespace plz
         // is small enough). The current code doesn't increment price counts
         // before initializing price tables, but it maybe done in future if
         // we add support for saving the state between LZMA2 chunks.
-        coder->match_price_count = UINT32_MAX / 2;
-        coder->align_price_count = UINT32_MAX / 2;
+        coder->matchPriceCount = UINT32_MAX / 2;
+        coder->alignPriceCount = UINT32_MAX / 2;
 
-        coder->opts_end_index = 0;
-        coder->opts_current_index = 0;
+        coder->optsEndIndex = 0;
+        coder->optsCurrentIndex = 0;
         return StatusCode::Ok;
     }
 

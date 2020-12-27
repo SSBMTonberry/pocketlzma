@@ -79,8 +79,14 @@ namespace plz
             /*! encode_init */
             inline bool init(LzmaMF *mf);
 
+            /*! lzma_lzma_encoder_reset */
+            StatusCode reset(const LzmaOptions *options);
+
             /*! encode_symbol */
             inline void encodeSymbol(LzmaMF *mf, uint32_t back, uint32_t len, uint32_t position);
+
+            /*! encode_eopm */
+            inline void encodeEopm(uint32_t position);
 
             /*! lzma_lzma_optimum_normal */
             inline void lzmaOptimumNormal(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position);
@@ -1208,6 +1214,82 @@ namespace plz
             rc.length(&repLenEncoder, pos_state, len, fastMode);
             UpdateLongRep(state);
         }
+    }
+
+    void Lzma1Encoder::encodeEopm(uint32_t position)
+    {
+        const uint32_t pos_state = position & posMask;
+        rc.bit(&isMatch[(uint8_t)state][pos_state], 1);
+        rc.bit(&isRep[(uint8_t)state], 0);
+        match(pos_state, UINT32_MAX, MATCH_LEN_MIN);
+    }
+
+    StatusCode Lzma1Encoder::reset(const LzmaOptions *options)
+    {
+
+        if (!options->isValid())
+            return StatusCode::OptionsError;
+
+        posMask = (1U << options->pb) - 1;
+        literalContextBits = options->lc;
+        literalPosMask = (1U << options->lp) - 1;
+
+        // Range coder
+        rc.reset();
+
+        // State
+        state = LzmaState::LitLit;
+        for (size_t i = 0; i < REPS; ++i)
+            reps[i] = 0;
+
+        LiteralInit(literal, options->lc, options->lp);
+
+        // Bit encoders
+        for (size_t i = 0; i < STATES; ++i) {
+            for (size_t j = 0; j <= posMask; ++j) {
+                BitReset(isMatch[i][j]);
+                BitReset(isRep0Long[i][j]);
+            }
+
+            BitReset(isRep[i]);
+            BitReset(isRep0[i]);
+            BitReset(isRep1[i]);
+            BitReset(isRep2[i]);
+        }
+
+        for (size_t i = 0; i < FULL_DISTANCES - DIST_MODEL_END; ++i)
+            BitReset(distSpecial[i]);
+
+        // Bit tree encoders
+        for (size_t i = 0; i < DIST_STATES; ++i)
+            BittreeReset(distSlot[i], DIST_SLOT_BITS);
+
+        BittreeReset(distAlign, ALIGN_BITS);
+
+        // Length encoders
+        matchLenEncoder.reset(1U << options->pb, fastMode);
+        repLenEncoder.reset(1U << options->pb, fastMode);
+
+        // Price counts are incremented every time appropriate probabilities
+        // are changed. price counts are set to zero when the price tables
+        // are updated, which is done when the appropriate price counts have
+        // big enough value, and lzma_mf.read_ahead == 0 which happens at
+        // least every OPTS (a few thousand) possible price count increments.
+        //
+        // By resetting price counts to UINT32_MAX / 2, we make sure that the
+        // price tables will be initialized before they will be used (since
+        // the value is definitely big enough), and that it is OK to increment
+        // price counts without risk of integer overflow (since UINT32_MAX / 2
+        // is small enough). The current code doesn't increment price counts
+        // before initializing price tables, but it maybe done in future if
+        // we add support for saving the state between LZMA2 chunks.
+        matchPriceCount = UINT32_MAX / 2;
+        alignPriceCount = UINT32_MAX / 2;
+
+        optsEndIndex = 0;
+        optsCurrentIndex = 0;
+
+        return StatusCode::Ok;
     }
 }
 

@@ -23,7 +23,7 @@ namespace plz
 
             Sequence sequence {Sequence::Init};
             /*! LZMA encoder */
-            void *lzma;
+            std::unique_ptr<Lzma1Encoder> lzma; //RBP: Make this unique_ptr - changed from void* to Lzma1Encoder
 
             /*! LZMA options currently in use. */
             LzmaOptions optCur;
