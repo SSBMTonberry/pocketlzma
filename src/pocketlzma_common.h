@@ -581,7 +581,7 @@ namespace plz
      *  The event names are in from STATE_oldest_older_previous. REP means
      *  either short or long repeated match, and NONLIT means any non-literal.
      */
-     enum class LzmaState
+     enum class LzmaState : uint8_t
      {
          LitLit,
          MatchLitLit,

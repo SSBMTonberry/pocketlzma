@@ -24,6 +24,9 @@ namespace plz
 
             /*! length_encoder_reset */
             inline void reset(const uint32_t num_pos_states, const bool fast_mode);
+            /*! get_len_price */
+            inline uint32_t getLenPrice(const uint32_t len, const uint32_t pos_state);
+
 
         private:
             /*! length_update_prices */
@@ -74,6 +77,13 @@ namespace plz
             p[i] = b1 + Price::RcBittreePrice(high, LEN_HIGH_BITS,
                                               i - LEN_LOW_SYMBOLS - LEN_MID_SYMBOLS);
 
+    }
+
+    uint32_t LengthEncoder::getLenPrice(const uint32_t len, const uint32_t pos_state)
+    {
+        // NOTE: Unlike the other price tables, length prices are updated
+        // in lzma_encoder.c
+        return prices[pos_state][len - MATCH_LEN_MIN];
     }
 }
 

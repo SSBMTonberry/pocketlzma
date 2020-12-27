@@ -84,47 +84,48 @@ namespace plz
                 + ((uint32_t)(prev_byte) >> (8U - (lc)))])
 
     /// Indicate that the latest state was a literal.
-    #define update_literal(state) \
-        state = ((state) <= STATE_SHORTREP_LIT_LIT \
-                ? STATE_LIT_LIT \
-                : ((state) <= STATE_LIT_SHORTREP \
-                    ? (state) - 3 \
-                    : (state) - 6))
+    //#define update_literal(state) \
+    //    state = ((state) <= STATE_SHORTREP_LIT_LIT \
+    //            ? STATE_LIT_LIT \
+    //            : ((state) <= STATE_LIT_SHORTREP \
+    //                ? (state) - 3 \
+    //                : (state) - 6))
 
-    /// Indicate that the latest state was a match.
-    //#define update_match(state) \
-    //    state = ((state) < LIT_STATES ? STATE_LIT_MATCH : STATE_NONLIT_MATCH)
+    /*! Based on the update_literal macro.
+     * Indicate that the latest state was a literal.
+     */
+    static inline void UpdateLiteral(LzmaState &state)
+    {
+        uint8_t s = (uint8_t) state;
+        uint8_t STATE_SHORTREP_LIT_LIT = (uint8_t) LzmaState::ShortRepLitLit;
+        uint8_t STATE_LIT_LIT = (uint8_t) LzmaState::LitLit;
+        uint8_t STATE_LIT_SHORTREP = (uint8_t) LzmaState::LitShortRep;
+        uint8_t newS = (s <= STATE_SHORTREP_LIT_LIT) ? STATE_LIT_LIT : ((s <= STATE_LIT_SHORTREP) ? s - 3 : s - 6);
+        state = (LzmaState) newS;
+    }
 
-    /// Indicate that the latest state was a long repeated match.
-    //#define update_long_rep(state) \
-    //    state = ((state) < LIT_STATES ? STATE_LIT_LONGREP : STATE_NONLIT_REP)
-
-    /// Indicate that the latest state was a short match.
-    //#define update_short_rep(state) \
-    //    state = ((state) < LIT_STATES ? STATE_LIT_SHORTREP : STATE_NONLIT_REP)
-
-    /// Test if the previous state was a literal.
-    //#define is_literal_state(state) \
-    //    ((state) < LIT_STATES)
-
-
+    /*! Based on get_dist_state - macro to get the index of the appropriate probability array.*/
+    static inline uint32_t GetDistState(uint32_t len)
+    {
+        return (len < (DIST_STATES + MATCH_LEN_MIN)) ? (len - MATCH_LEN_MIN) : (DIST_STATES - 1);
+    }
 
     /*! Indicate that the latest state was a match. */
     static inline void UpdateMatch(LzmaState &state)
     {
-        state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitMatch: LzmaState::NonLitMatch;
+        state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitMatch : LzmaState::NonLitMatch;
     }
 
     /*! Indicate that the latest state was a long repeated match. */
     static inline void UpdateLongRep(LzmaState &state)
     {
-        state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitLongRep: LzmaState::NonLitRep;
+        state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitLongRep : LzmaState::NonLitRep;
     }
 
     /*! Indicate that the latest state was a short match. */
     static inline void UpdateShortRep(LzmaState &state)
     {
-        state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitShortRep: LzmaState::NonLitRep;
+        state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitShortRep : LzmaState::NonLitRep;
     }
 
     /*! Test if the previous state was a literal. */

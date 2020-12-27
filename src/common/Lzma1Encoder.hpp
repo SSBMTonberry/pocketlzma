@@ -95,17 +95,32 @@ namespace plz
             /*! helper1
              *  A horrible function doing something important.
              * */
-            inline uint32_t helper1(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position);
+            inline uint32_t optimumNormalHelper1(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position);
 
             /*! helper2
              *  Another horrible function doing something important.*/
-            inline uint32_t helper2(uint32_t *reps, const uint8_t *buf,
-                    uint32_t len_end, uint32_t position, const uint32_t cur,
-                    const uint32_t nice_len, const uint32_t buf_avail_full);
+            inline uint32_t optimumNormalHelper2(uint32_t *reps, const uint8_t *buf,
+                                                 uint32_t len_end, uint32_t position, const uint32_t cur,
+                                                 const uint32_t nice_len, const uint32_t buf_avail_full);
 
             /*! get_literal_price */
             inline uint32_t getLiteralPrice(const uint32_t pos, const uint32_t prev_byte, const bool match_mode,
                               uint32_t match_byte, uint32_t symbol);
+
+            /*! get_short_rep_price */
+            inline uint32_t getShortRepPrice(const LzmaState state, const uint32_t pos_state);
+
+            /*! get_pure_rep_price */
+            inline uint32_t getPureRepPrice(const uint32_t rep_index, const LzmaState state, uint32_t pos_state);
+
+            /*! get_rep_price */
+            inline uint32_t getRepPrice(const uint32_t rep_index, const uint32_t len, const LzmaState state,
+                          const uint32_t pos_state);
+
+            /*! get_dist_len_price */
+            inline uint32_t getDistLenPrice(const uint32_t dist, const uint32_t len, const uint32_t pos_state);
+
+            inline void backward(uint32_t * len_res, uint32_t * back_res, uint32_t cur);
 
     };
 
@@ -316,7 +331,7 @@ namespace plz
         // the original function into two pieces makes it at least a little
         // more readable, since those two parts don't share many variables.
 
-        uint32_t len_end = helper1(mf, back_res, len_res, position);
+        uint32_t len_end = optimumNormalHelper1(mf, back_res, len_res, position);
         if (len_end == UINT32_MAX)
             return;
 
@@ -332,12 +347,12 @@ namespace plz
             if (longestMatchLength >= mf->niceLen)
                 break;
 
-            len_end = helper2(coder, reps, mf_ptr(mf) - 1, len_end,
-                              position + cur, cur, mf->nice_len,
-                              my_min(mf_avail(mf) + 1, OPTS - 1 - cur));
+            len_end = optimumNormalHelper2(reps, mf->ptr() - 1, len_end,
+                                           position + cur, cur, mf->niceLen,
+                                           my_min(mf->avail() + 1, OPTS - 1 - cur));
         }
 
-        backward(coder, len_res, back_res, cur);
+        backward(len_res, back_res, cur);
     }
 
     void Lzma1Encoder::fillDistPrices()
@@ -397,7 +412,7 @@ namespace plz
         alignPriceCount = 0;
     }
 
-    uint32_t Lzma1Encoder::helper1(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position)
+    uint32_t Lzma1Encoder::optimumNormalHelper1(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position)
     {
         const uint32_t nice_len = mf->niceLen;
 
@@ -438,7 +453,8 @@ namespace plz
                 rep_max_index = i;
         }
 
-        if (rep_lens[rep_max_index] >= nice_len) {
+        if (rep_lens[rep_max_index] >= nice_len)
+        {
             *back_res = rep_max_index;
             *len_res = rep_lens[rep_max_index];
             mf->mfSkip(*len_res - 1);
@@ -446,7 +462,8 @@ namespace plz
         }
 
 
-        if (len_main >= nice_len) {
+        if (len_main >= nice_len)
+        {
             *back_res = matches[matches_count - 1].dist + REPS;
             *len_res = len_main;
             mf->mfSkip(len_main - 1);
@@ -457,7 +474,8 @@ namespace plz
         const uint8_t match_byte = *(buf - reps[0] - 1);
 
         if (len_main < 2 && current_byte != match_byte
-            && rep_lens[rep_max_index] < 2) {
+            && rep_lens[rep_max_index] < 2)
+        {
             *back_res = UINT32_MAX;
             *len_res = 1;
             return UINT32_MAX;
@@ -467,24 +485,21 @@ namespace plz
 
         const uint32_t pos_state = position & posMask;
 
-        opts[1].price = Price::RcBit0Price(isMatch[state][pos_state])
-                               + getLiteralPrice(position, buf[-1], !is_literal_state(state), match_byte, current_byte);
+        opts[1].price = Price::RcBit0Price(isMatch[(uint8_t)state][pos_state])
+                               + getLiteralPrice(position, buf[-1], !IsLiteralState(state), match_byte, current_byte);
 
-        make_literal(&opts[1]);
+        opts[1].makeLiteral();
 
-        const uint32_t match_price = rc_bit_1_price(
-                is_match[state][pos_state]);
-        const uint32_t rep_match_price = match_price
-                                         + rc_bit_1_price(is_rep[state]);
+        const uint32_t match_price = Price::RcBit1Price(isMatch[(uint8_t)state][pos_state]);
+        const uint32_t rep_match_price = match_price + Price::RcBit1Price(isRep[(uint8_t)state]);
 
-        if (match_byte == current_byte) {
-            const uint32_t short_rep_price = rep_match_price
-                                             + get_short_rep_price(
-                    coder, state, pos_state);
+        if (match_byte == current_byte)
+        {
+            const uint32_t short_rep_price = rep_match_price + getShortRepPrice(state, pos_state);
 
             if (short_rep_price < opts[1].price) {
                 opts[1].price = short_rep_price;
-                make_short_rep(&opts[1]);
+                opts[1].makeShortRep();
             }
         }
 
@@ -512,27 +527,23 @@ namespace plz
             if (rep_len < 2)
                 continue;
 
-            const uint32_t price = rep_match_price + get_pure_rep_price(
-                    coder, i, state, pos_state);
+            const uint32_t price = rep_match_price + getPureRepPrice(i, state, pos_state);
 
             do {
-                const uint32_t cur_and_len_price = price
-                                                   + get_len_price(
-                        &rep_len_encoder,
-                        rep_len, pos_state);
+                const uint32_t cur_and_len_price = price + repLenEncoder.getLenPrice(rep_len, pos_state);
 
                 if (cur_and_len_price < opts[rep_len].price) {
                     opts[rep_len].price = cur_and_len_price;
-                    opts[rep_len].pos_prev = 0;
-                    opts[rep_len].back_prev = i;
-                    opts[rep_len].prev_1_is_literal = false;
+                    opts[rep_len].posPrev = 0;
+                    opts[rep_len].backPrev = i;
+                    opts[rep_len].prev1IsLiteral = false;
                 }
             } while (--rep_len >= 2);
         }
 
 
         const uint32_t normal_match_price = match_price
-                                            + rc_bit_0_price(is_rep[state]);
+                                            + Price::RcBit0Price(isRep[(uint8_t)state]);
 
         len = rep_lens[0] >= 2 ? rep_lens[0] + 1 : 2;
         if (len <= len_main) {
@@ -543,14 +554,13 @@ namespace plz
             for(; ; ++len) {
                 const uint32_t dist = matches[i].dist;
                 const uint32_t cur_and_len_price = normal_match_price
-                                                   + get_dist_len_price(coder,
-                                                                        dist, len, pos_state);
+                                                   + getDistLenPrice(dist, len, pos_state);
 
                 if (cur_and_len_price < opts[len].price) {
                     opts[len].price = cur_and_len_price;
-                    opts[len].pos_prev = 0;
-                    opts[len].back_prev = dist + REPS;
-                    opts[len].prev_1_is_literal = false;
+                    opts[len].posPrev = 0;
+                    opts[len].backPrev = dist + REPS;
+                    opts[len].prev1IsLiteral = false;
                 }
 
                 if (len == matches[i].len)
@@ -592,15 +602,16 @@ namespace plz
         return price;
     }
 
-    uint32_t Lzma1Encoder::helper2(uint32_t *reps, const uint8_t *buf, uint32_t len_end, uint32_t position, const uint32_t cur, const uint32_t nice_len,
-                          const uint32_t buf_avail_full)
+    uint32_t Lzma1Encoder::optimumNormalHelper2(uint32_t *reps, const uint8_t *buf, uint32_t len_end, uint32_t position, const uint32_t cur, const uint32_t nice_len,
+                                                const uint32_t buf_avail_full)
     {
         uint32_t matches_count = matches_count;
         uint32_t new_len = longestMatchLength;
         uint32_t pos_prev = opts[cur].posPrev;
         LzmaState lzmaState;
 
-        if (opts[cur].prev1IsLiteral) {
+        if (opts[cur].prev1IsLiteral)
+        {
             --pos_prev;
 
             if (opts[cur].prev2) {
@@ -615,18 +626,23 @@ namespace plz
                 lzmaState = opts[pos_prev].state;
             }
 
-            update_literal(lzmaState);
+            UpdateLiteral(lzmaState);
 
-        } else {
+        }
+        else
+        {
             lzmaState = opts[pos_prev].state;
         }
 
-        if (pos_prev == cur - 1) {
-            if (is_short_rep(opts[cur]))
+        if (pos_prev == cur - 1)
+        {
+            if (opts[cur].isShortRep())
                 UpdateShortRep(lzmaState);
             else
-                update_literal(lzmaState);
-        } else {
+                UpdateLiteral(lzmaState);
+        }
+        else
+        {
             uint32_t pos;
             if (opts[cur].prev1IsLiteral
                 && opts[cur].prev2)
@@ -951,6 +967,100 @@ namespace plz
         }
 
         return len_end;
+    }
+
+    uint32_t Lzma1Encoder::getShortRepPrice(const LzmaState state, const uint32_t pos_state)
+    {
+        return Price::RcBit0Price(isRep0[(uint8_t)state])
+               + Price::RcBit0Price(isRep0Long[(uint8_t)state][pos_state]);
+    }
+
+    uint32_t Lzma1Encoder::getPureRepPrice(const uint32_t rep_index, const LzmaState state, uint32_t pos_state)
+    {
+        uint32_t price;
+
+        if (rep_index == 0) {
+            price = Price::RcBit0Price(isRep0[(uint8_t)state]);
+            price += Price::RcBit1Price(isRep0Long[(uint8_t)state][pos_state]);
+        } else {
+            price = Price::RcBit1Price(isRep0[(uint8_t)state]);
+
+            if (rep_index == 1) {
+                price += Price::RcBit0Price(isRep1[(uint8_t)state]);
+            } else {
+                price += Price::RcBit1Price(isRep1[(uint8_t)state]);
+                price += Price::RcBitPrice(isRep2[(uint8_t)state],
+                                      rep_index - 2);
+            }
+        }
+
+        return price;
+    }
+
+    uint32_t Lzma1Encoder::getRepPrice(const uint32_t rep_index, const uint32_t len, const LzmaState state, const uint32_t pos_state)
+    {
+        return repLenEncoder.getLenPrice(len, pos_state)
+               + getPureRepPrice(rep_index, state, pos_state);
+    }
+
+    uint32_t Lzma1Encoder::getDistLenPrice(const uint32_t dist, const uint32_t len, const uint32_t pos_state)
+    {
+
+        const uint32_t dist_state = GetDistState(len);
+        uint32_t price;
+
+        if (dist < FULL_DISTANCES) {
+            price = distPrices[dist_state][dist];
+        } else {
+            const uint32_t dist_slot = GetDistSlot2(dist);
+            price = distSlotPrices[dist_state][dist_slot]
+                    + alignPrices[dist & ALIGN_MASK];
+        }
+
+        price += matchLenEncoder.getLenPrice(len, pos_state);
+
+        return price;
+    }
+
+    void Lzma1Encoder::backward(uint32_t *len_res, uint32_t *back_res, uint32_t cur)
+    {
+        optsEndIndex = cur;
+
+        uint32_t pos_mem = opts[cur].posPrev;
+        uint32_t back_mem = opts[cur].backPrev;
+
+        do
+        {
+            if (opts[cur].prev1IsLiteral)
+            {
+                opts[pos_mem].makeLiteral();
+                opts[pos_mem].posPrev = pos_mem - 1;
+
+                if (opts[cur].prev2)
+                {
+                    opts[pos_mem - 1].prev1IsLiteral = false;
+                    opts[pos_mem - 1].posPrev = opts[cur].posPrev2;
+                    opts[pos_mem - 1].backPrev = opts[cur].backPrev2;
+                }
+            }
+
+            const uint32_t pos_prev = pos_mem;
+            const uint32_t back_cur = back_mem;
+
+            back_mem = opts[pos_prev].backPrev;
+            pos_mem = opts[pos_prev].posPrev;
+
+            opts[pos_prev].backPrev = back_cur;
+            opts[pos_prev].posPrev = cur;
+            cur = pos_prev;
+
+        } while (cur != 0);
+
+        optsCurrentIndex = opts[0].posPrev;
+        *len_res = opts[0].posPrev;
+        *back_res = opts[0].backPrev;
+
+        return;
     }
 }
 
