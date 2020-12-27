@@ -51,7 +51,8 @@ namespace plz
         // Get the lowest bits of the uncompressed offset from the LZ layer.
         uint32_t position = mf->position();
 
-        while (true) {
+        while (true)
+        {
             // Encode pending bits, if any. Calling this before encoding
             // the next symbol is needed only with plain LZMA, since
             // LZMA2 always provides big enough buffer to flush
@@ -96,18 +97,18 @@ namespace plz
             uint32_t back;
 
             if (coder->fastMode)
-                lzma_lzma_optimum_fast(coder, mf, &back, &len);
+                coder->lzmaOptimumFast(mf, &back, &len);
             else
-                lzma_lzma_optimum_normal(
-                        coder, mf, &back, &len, position);
+                coder->lzmaOptimumNormal(mf, &back, &len, position);
 
-            encode_symbol(coder, mf, back, len, position);
+            coder->encodeSymbol(mf, back, len, position);
 
             position += len;
         }
 
-        if (!coder->is_flushed) {
-            coder->is_flushed = true;
+        if (!coder->isFlushed)
+        {
+            coder->isFlushed = true;
 
             // We don't support encoding plain LZMA streams without EOPM,
             // and LZMA2 doesn't use EOPM at LZMA level.
@@ -115,20 +116,21 @@ namespace plz
                 encode_eopm(coder, position);
 
             // Flush the remaining bytes from the range encoder.
-            rc_flush(&coder->rc);
+            coder->rc.flush();
 
             // Copy the remaining bytes to the output buffer. If there
             // isn't enough output space, we will copy out the remaining
             // bytes on the next call to this function by using
             // the rc_encode() call in the encoding loop above.
-            if (rc_encode(&coder->rc, out, out_pos, out_size)) {
+            if (coder->rc.encode(out, out_pos, out_size))
+            {
                 assert(limit == UINT32_MAX);
-                return LZMA_OK;
+                return StatusCode::Ok;
             }
         }
 
         // Make it ready for the next LZMA2 chunk.
-        coder->is_flushed = false;
+        coder->isFlushed = false;
 
         return StatusCode::StreamEnd;
     }

@@ -79,6 +79,9 @@ namespace plz
             /*! encode_init */
             inline bool init(LzmaMF *mf);
 
+            /*! encode_symbol */
+            inline void encodeSymbol(LzmaMF *mf, uint32_t back, uint32_t len, uint32_t position);
+
             /*! lzma_lzma_optimum_normal */
             inline void lzmaOptimumNormal(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position);
 
@@ -121,6 +124,16 @@ namespace plz
             inline uint32_t getDistLenPrice(const uint32_t dist, const uint32_t len, const uint32_t pos_state);
 
             inline void backward(uint32_t * len_res, uint32_t * back_res, uint32_t cur);
+
+
+            /*! literal
+             *  Named literalFunc to not get confused with the variable named "literal"
+             */
+            inline void literalFunc(LzmaMF *mf, uint32_t position);
+
+            inline void match(const uint32_t pos_state, const uint32_t distance, const uint32_t len);
+            /*! rep_match - Repeated match */
+            inline void repMatch(const uint32_t pos_state, const uint32_t rep, const uint32_t len);
 
     };
 
@@ -694,33 +707,34 @@ namespace plz
         const uint32_t cur_and_1_price = cur_price
                                          + Price::RcBit0Price(isMatch[(uint8_t)lzmaState][pos_state])
                                          + getLiteralPrice(position, buf[-1],
-                                                             !is_literal_state(lzmaState), match_byte, current_byte);
+                                                             !IsLiteralState(lzmaState), match_byte, current_byte);
 
         bool next_is_literal = false;
 
         if (cur_and_1_price < opts[cur + 1].price) {
             opts[cur + 1].price = cur_and_1_price;
-            opts[cur + 1].pos_prev = cur;
-            make_literal(&opts[cur + 1]);
+            opts[cur + 1].posPrev = cur;
+            opts[cur + 1].makeLiteral();
             next_is_literal = true;
         }
 
         const uint32_t match_price = cur_price
-                                     + rc_bit_1_price(is_match[lzmaState][pos_state]);
+                                     + Price::RcBit1Price(isMatch[(uint8_t)lzmaState][pos_state]);
         const uint32_t rep_match_price = match_price
-                                         + rc_bit_1_price(is_rep[lzmaState]);
+                                         + Price::RcBit1Price(isRep[(uint8_t)lzmaState]);
 
         if (match_byte == current_byte
-            && !(opts[cur + 1].pos_prev < cur
-                 && opts[cur + 1].back_prev == 0)) {
+            && !(opts[cur + 1].posPrev < cur
+                 && opts[cur + 1].backPrev == 0))
+        {
 
-            const uint32_t short_rep_price = rep_match_price
-                                             + get_short_rep_price(coder, lzmaState, pos_state);
+            const uint32_t short_rep_price = rep_match_price + getShortRepPrice(lzmaState, pos_state);
 
-            if (short_rep_price <= opts[cur + 1].price) {
+            if (short_rep_price <= opts[cur + 1].price)
+            {
                 opts[cur + 1].price = short_rep_price;
-                opts[cur + 1].pos_prev = cur;
-                make_short_rep(&opts[cur + 1]);
+                opts[cur + 1].posPrev = cur;
+                opts[cur + 1].makeShortRep();
                 next_is_literal = true;
             }
         }
@@ -735,16 +749,17 @@ namespace plz
             const uint8_t *const buf_back = buf - reps[0] - 1;
             const uint32_t limit = my_min(buf_avail_full, nice_len + 1);
 
-            const uint32_t len_test = lzma_memcmplen(buf, buf_back, 1, limit) - 1;
+            const uint32_t len_test = LzmaMemcmplen(buf, buf_back, 1, limit) - 1;
 
-            if (len_test >= 2) {
-                lzma_lzma_state state_2 = lzmaState;
-                update_literal(state_2);
+            if (len_test >= 2)
+            {
+                LzmaState state_2 = lzmaState;
+                UpdateLiteral(state_2);
 
-                const uint32_t pos_state_next = (position + 1) & pos_mask;
+                const uint32_t pos_state_next = (position + 1) & posMask;
                 const uint32_t next_rep_match_price = cur_and_1_price
-                                                      + rc_bit_1_price(is_match[state_2][pos_state_next])
-                                                      + rc_bit_1_price(is_rep[state_2]);
+                                                      + Price::RcBit1Price(isMatch[(uint8_t)state_2][pos_state_next])
+                                                      + Price::RcBit1Price(isRep[(uint8_t)state_2]);
 
                 //for (; len_test >= 2; --len_test) {
                 const uint32_t offset = cur + 1 + len_test;
@@ -753,15 +768,15 @@ namespace plz
                     opts[++len_end].price = RC_INFINITY_PRICE;
 
                 const uint32_t cur_and_len_price = next_rep_match_price
-                                                   + get_rep_price(coder, 0, len_test,
-                                                                   state_2, pos_state_next);
+                                                   + getRepPrice(0, len_test, state_2, pos_state_next);
 
-                if (cur_and_len_price < opts[offset].price) {
+                if (cur_and_len_price < opts[offset].price)
+                {
                     opts[offset].price = cur_and_len_price;
-                    opts[offset].pos_prev = cur + 1;
-                    opts[offset].back_prev = 0;
-                    opts[offset].prev_1_is_literal = true;
-                    opts[offset].prev_2 = false;
+                    opts[offset].posPrev = cur + 1;
+                    opts[offset].backPrev = 0;
+                    opts[offset].prev1IsLiteral = true;
+                    opts[offset].prev2 = false;
                 }
                 //}
             }
@@ -775,25 +790,23 @@ namespace plz
             if (not_equal_16(buf, buf_back))
                 continue;
 
-            uint32_t len_test = lzma_memcmplen(buf, buf_back, 2, buf_avail);
+            uint32_t len_test = LzmaMemcmplen(buf, buf_back, 2, buf_avail);
 
             while (len_end < cur + len_test)
                 opts[++len_end].price = RC_INFINITY_PRICE;
 
             const uint32_t len_test_temp = len_test;
-            const uint32_t price = rep_match_price + get_pure_rep_price(
-                    coder, rep_index, lzmaState, pos_state);
+            const uint32_t price = rep_match_price + getPureRepPrice(rep_index, lzmaState, pos_state);
 
-            do {
-                const uint32_t cur_and_len_price = price
-                                                   + get_len_price(&rep_len_encoder,
-                                                                   len_test, pos_state);
+            do
+            {
+                const uint32_t cur_and_len_price = price + repLenEncoder.getLenPrice(len_test, pos_state);
 
                 if (cur_and_len_price < opts[cur + len_test].price) {
                     opts[cur + len_test].price = cur_and_len_price;
-                    opts[cur + len_test].pos_prev = cur;
-                    opts[cur + len_test].back_prev = rep_index;
-                    opts[cur + len_test].prev_1_is_literal = false;
+                    opts[cur + len_test].posPrev = cur;
+                    opts[cur + len_test].backPrev = rep_index;
+                    opts[cur + len_test].prev1IsLiteral = false;
                 }
             } while (--len_test >= 2);
 
@@ -809,58 +822,56 @@ namespace plz
             // NOTE: len_test_2 may be greater than limit so the call to
             // lzma_memcmplen() must be done conditionally.
             if (len_test_2 < limit)
-                len_test_2 = lzma_memcmplen(buf, buf_back, len_test_2, limit);
+                len_test_2 = LzmaMemcmplen(buf, buf_back, len_test_2, limit);
 
             len_test_2 -= len_test + 1;
 
-            if (len_test_2 >= 2) {
-                lzma_lzma_state state_2 = lzmaState;
-                update_long_rep(state_2);
+            if (len_test_2 >= 2)
+            {
+                LzmaState state_2 = lzmaState;
+                UpdateLongRep(state_2);
 
-                uint32_t pos_state_next = (position + len_test) & pos_mask;
+                uint32_t pos_state_next = (position + len_test) & posMask;
 
                 const uint32_t cur_and_len_literal_price = price
-                                                           + get_len_price(&rep_len_encoder,
-                                                                           len_test, pos_state)
-                                                           + rc_bit_0_price(is_match[state_2][pos_state_next])
-                                                           + get_literal_price(coder, position + len_test,
+                                                           + repLenEncoder.getLenPrice(len_test, pos_state)
+                                                           + Price::RcBit0Price(isMatch[(uint8_t)state_2][pos_state_next])
+                                                           + getLiteralPrice(position + len_test,
                                                                                buf[len_test - 1], true,
                                                                                buf_back[len_test], buf[len_test]);
 
-                update_literal(state_2);
+                UpdateLiteral(state_2);
 
-                pos_state_next = (position + len_test + 1) & pos_mask;
+                pos_state_next = (position + len_test + 1) & posMask;
 
                 const uint32_t next_rep_match_price = cur_and_len_literal_price
-                                                      + rc_bit_1_price(is_match[state_2][pos_state_next])
-                                                      + rc_bit_1_price(is_rep[state_2]);
+                                                      + Price::RcBit1Price(isMatch[(uint8_t)state_2][pos_state_next])
+                                                      + Price::RcBit1Price(isRep[(uint8_t)state_2]);
 
-                //for(; len_test_2 >= 2; len_test_2--) {
                 const uint32_t offset = cur + len_test + 1 + len_test_2;
 
                 while (len_end < offset)
                     opts[++len_end].price = RC_INFINITY_PRICE;
 
                 const uint32_t cur_and_len_price = next_rep_match_price
-                                                   + get_rep_price(coder, 0, len_test_2,
-                                                                   state_2, pos_state_next);
+                                                   + getRepPrice(0, len_test_2, state_2, pos_state_next);
 
-                if (cur_and_len_price < opts[offset].price) {
+                if (cur_and_len_price < opts[offset].price)
+                {
                     opts[offset].price = cur_and_len_price;
-                    opts[offset].pos_prev = cur + len_test + 1;
-                    opts[offset].back_prev = 0;
-                    opts[offset].prev_1_is_literal = true;
-                    opts[offset].prev_2 = true;
-                    opts[offset].pos_prev_2 = cur;
-                    opts[offset].back_prev_2 = rep_index;
+                    opts[offset].posPrev = cur + len_test + 1;
+                    opts[offset].backPrev = 0;
+                    opts[offset].prev1IsLiteral = true;
+                    opts[offset].prev2 = true;
+                    opts[offset].posPrev2 = cur;
+                    opts[offset].backPrev2 = rep_index;
                 }
-                //}
             }
         }
 
 
-        //for (uint32_t len_test = 2; len_test <= new_len; ++len_test)
-        if (new_len > buf_avail) {
+        if (new_len > buf_avail)
+        {
             new_len = buf_avail;
 
             matches_count = 0;
@@ -871,9 +882,9 @@ namespace plz
         }
 
 
-        if (new_len >= start_len) {
-            const uint32_t normal_match_price = match_price
-                                                + rc_bit_0_price(is_rep[lzmaState]);
+        if (new_len >= start_len)
+        {
+            const uint32_t normal_match_price = match_price + Price::RcBit0Price(isRep[(uint8_t)lzmaState]);
 
             while (len_end < cur + new_len)
                 opts[++len_end].price = RC_INFINITY_PRICE;
@@ -882,18 +893,18 @@ namespace plz
             while (start_len > matches[i].len)
                 ++i;
 
-            for (uint32_t len_test = start_len; ; ++len_test) {
+            for (uint32_t len_test = start_len; ; ++len_test)
+            {
                 const uint32_t cur_back = matches[i].dist;
                 uint32_t cur_and_len_price = normal_match_price
-                                             + get_dist_len_price(coder,
-                                                                  cur_back, len_test, pos_state);
+                                             + getDistLenPrice(cur_back, len_test, pos_state);
 
                 if (cur_and_len_price < opts[cur + len_test].price) {
                     opts[cur + len_test].price = cur_and_len_price;
-                    opts[cur + len_test].pos_prev = cur;
-                    opts[cur + len_test].back_prev
+                    opts[cur + len_test].posPrev = cur;
+                    opts[cur + len_test].backPrev
                             = cur_back + REPS;
-                    opts[cur + len_test].prev_1_is_literal = false;
+                    opts[cur + len_test].prev1IsLiteral = false;
                 }
 
                 if (len_test == matches[i].len) {
@@ -907,35 +918,32 @@ namespace plz
                     // so the call to lzma_memcmplen() must be
                     // done conditionally.
                     if (len_test_2 < limit)
-                        len_test_2 = lzma_memcmplen(buf, buf_back,
-                                                    len_test_2, limit);
+                        len_test_2 = LzmaMemcmplen(buf, buf_back, len_test_2, limit);
 
                     len_test_2 -= len_test + 1;
 
-                    if (len_test_2 >= 2) {
-                        lzma_lzma_state state_2 = lzmaState;
-                        update_match(state_2);
+                    if (len_test_2 >= 2)
+                    {
+                        LzmaState state_2 = lzmaState;
+                        UpdateMatch(state_2);
                         uint32_t pos_state_next
-                                = (position + len_test) & pos_mask;
+                                = (position + len_test) & posMask;
 
                         const uint32_t cur_and_len_literal_price = cur_and_len_price
-                                                                   + rc_bit_0_price(
-                                is_match[state_2][pos_state_next])
-                                                                   + get_literal_price(coder,
-                                                                                       position + len_test,
+                                                                   + Price::RcBit0Price(isMatch[(uint8_t)state_2][pos_state_next])
+                                                                   + getLiteralPrice(position + len_test,
                                                                                        buf[len_test - 1],
                                                                                        true,
                                                                                        buf_back[len_test],
                                                                                        buf[len_test]);
 
-                        update_literal(state_2);
-                        pos_state_next = (pos_state_next + 1) & pos_mask;
+                        UpdateLiteral(state_2);
+                        pos_state_next = (pos_state_next + 1) & posMask;
 
                         const uint32_t next_rep_match_price
                                 = cur_and_len_literal_price
-                                  + rc_bit_1_price(
-                                        is_match[state_2][pos_state_next])
-                                  + rc_bit_1_price(is_rep[state_2]);
+                                  + Price::RcBit1Price(isMatch[(uint8_t)state_2][pos_state_next])
+                                  + Price::RcBit1Price(isRep[(uint8_t)state_2]);
 
                         // for(; len_test_2 >= 2; --len_test_2) {
                         const uint32_t offset = cur + len_test + 1 + len_test_2;
@@ -944,20 +952,19 @@ namespace plz
                             opts[++len_end].price = RC_INFINITY_PRICE;
 
                         cur_and_len_price = next_rep_match_price
-                                            + get_rep_price(coder, 0, len_test_2,
-                                                            state_2, pos_state_next);
+                                            + getRepPrice(0, len_test_2, state_2, pos_state_next);
 
-                        if (cur_and_len_price < opts[offset].price) {
+                        if (cur_and_len_price < opts[offset].price)
+                        {
                             opts[offset].price = cur_and_len_price;
-                            opts[offset].pos_prev = cur + len_test + 1;
-                            opts[offset].back_prev = 0;
-                            opts[offset].prev_1_is_literal = true;
-                            opts[offset].prev_2 = true;
-                            opts[offset].pos_prev_2 = cur;
-                            opts[offset].back_prev_2
-                                    = cur_back + REPS;
+                            opts[offset].posPrev = cur + len_test + 1;
+                            opts[offset].backPrev = 0;
+                            opts[offset].prev1IsLiteral = true;
+                            opts[offset].prev2 = true;
+                            opts[offset].posPrev2 = cur;
+                            opts[offset].backPrev2 = cur_back + REPS;
                         }
-                        //}
+
                     }
 
                     if (++i == matches_count)
@@ -1061,6 +1068,146 @@ namespace plz
         *back_res = opts[0].backPrev;
 
         return;
+    }
+
+    void Lzma1Encoder::encodeSymbol(LzmaMF *mf, uint32_t back, uint32_t len, uint32_t position)
+    {
+        const uint32_t pos_state = position & posMask;
+
+        if (back == UINT32_MAX)
+        {
+            // Literal i.e. eight-bit byte
+            assert(len == 1);
+            rc.bit( &isMatch[(uint8_t)state][pos_state], 0);
+            literalFunc(mf, position);
+        }
+        else
+        {
+            // Some type of match
+            rc.bit(&isMatch[(uint8_t)state][pos_state], 1);
+
+            if (back < REPS)
+            {
+                // It's a repeated match i.e. the same distance
+                // has been used earlier.
+                rc.bit(&isRep[(uint8_t)state], 1);
+                repMatch(pos_state, back, len);
+            }
+            else
+            {
+                // Normal match
+                rc.bit(&isRep[(uint8_t)state], 0);
+                match(pos_state, back - REPS, len);
+            }
+        }
+
+        assert(mf->readAhead >= len);
+        mf->readAhead -= len;
+    }
+
+    void Lzma1Encoder::literalFunc(LzmaMF *mf, uint32_t position)
+    {
+        // Locate the literal byte to be encoded and the subcoder.
+        const uint8_t cur_byte = mf->buffer[
+                mf->readPos - mf->readAhead];
+        probability *subcoder = literal_subcoder(literal,
+                                                 literalContextBits, literalPosMask,
+                                                 position, mf->buffer[mf->readPos - mf->readAhead - 1]);
+
+        if (IsLiteralState(state))
+        {
+            // Previous LZMA-symbol was a literal. Encode a normal
+            // literal without a match byte.
+            rc.bittree(subcoder, 8, cur_byte);
+        }
+        else
+        {
+            // Previous LZMA-symbol was a match. Use the last byte of
+            // the match as a "match byte". That is, compare the bits
+            // of the current literal and the match byte.
+            const uint8_t match_byte = mf->buffer[
+                    mf->readPos - reps[0] - 1
+                    - mf->readAhead];
+            rc.literalMatched(subcoder, match_byte, cur_byte);
+        }
+
+        UpdateLiteral(state);
+    }
+
+    void Lzma1Encoder::match(const uint32_t pos_state, const uint32_t distance, const uint32_t len)
+    {
+        UpdateMatch(state);
+
+        rc.length(&matchLenEncoder, pos_state, len, fastMode);
+
+        const uint32_t dist_slot = GetDistSlot(distance);
+        const uint32_t dist_state = GetDistState(len);
+        rc.bittree(distSlot[dist_state], DIST_SLOT_BITS, dist_slot);
+
+        if (dist_slot >= DIST_MODEL_START) {
+            const uint32_t footer_bits = (dist_slot >> 1) - 1;
+            const uint32_t base = (2 | (dist_slot & 1)) << footer_bits;
+            const uint32_t dist_reduced = distance - base;
+
+            if (dist_slot < DIST_MODEL_END)
+            {
+                // Careful here: base - dist_slot - 1 can be -1, but
+                // rc_bittree_reverse starts at probs[1], not probs[0].
+                rc.bittreeReverse(distSpecial + base - dist_slot - 1, footer_bits, dist_reduced);
+            }
+            else
+            {
+                rc.direct(dist_reduced >> ALIGN_BITS, footer_bits - ALIGN_BITS);
+                rc.bittreeReverse(distAlign, ALIGN_BITS, dist_reduced & ALIGN_MASK);
+                ++alignPriceCount;
+            }
+        }
+
+        reps[3] = reps[2];
+        reps[2] = reps[1];
+        reps[1] = reps[0];
+        reps[0] = distance;
+        ++matchPriceCount;
+    }
+
+    void Lzma1Encoder::repMatch(const uint32_t pos_state, const uint32_t rep, const uint32_t len)
+    {
+        if (rep == 0) {
+            rc.bit(&isRep0[(uint8_t)state], 0);
+            rc.bit(&isRep0Long[(uint8_t)state][pos_state],
+                   len != 1);
+        } else {
+            const uint32_t distance = reps[rep];
+            rc.bit( &isRep0[(uint8_t)state], 1);
+
+            if (rep == 1)
+            {
+                rc.bit(&isRep1[(uint8_t)state], 0);
+            }
+            else
+            {
+                rc.bit(&isRep1[(uint8_t)state], 1);
+                rc.bit(&isRep2[(uint8_t)state], rep - 2);
+
+                if (rep == 3)
+                    reps[3] = reps[2];
+
+                reps[2] = reps[1];
+            }
+
+            reps[1] = reps[0];
+            reps[0] = distance;
+        }
+
+        if (len == 1)
+        {
+            UpdateShortRep(state);
+        }
+        else
+        {
+            rc.length(&repLenEncoder, pos_state, len, fastMode);
+            UpdateLongRep(state);
+        }
     }
 }
 

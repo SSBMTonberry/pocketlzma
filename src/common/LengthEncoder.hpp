@@ -26,9 +26,6 @@ namespace plz
             inline void reset(const uint32_t num_pos_states, const bool fast_mode);
             /*! get_len_price */
             inline uint32_t getLenPrice(const uint32_t len, const uint32_t pos_state);
-
-
-        private:
             /*! length_update_prices */
             inline void updatePrices(const uint32_t pos_state);
     };

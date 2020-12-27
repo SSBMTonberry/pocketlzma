@@ -62,6 +62,9 @@ namespace plz
             inline bool encode(uint8_t *out, size_t *out_pos, size_t out_size);
             /*! rc_pending */
             inline uint64_t pending();
+            /*! literal_matched */
+            inline void literalMatched(probability *subcoder, uint32_t match_byte, uint32_t symbol);
+            inline void length(LengthEncoder *lc, const uint32_t pos_state, uint32_t len, const bool fast_mode);
 
             /*! Symbol to int converter*/
             inline uint32_t sint(Symbol s);
@@ -232,6 +235,55 @@ namespace plz
     RangeEncoder::Symbol RangeEncoder::intToSymbol(uint32_t i)
     {
         return static_cast<RangeEncoder::Symbol>(i);
+    }
+
+    void RangeEncoder::literalMatched(probability *subcoder, uint32_t match_byte, uint32_t symbol)
+    {
+        uint32_t offset = 0x100;
+        symbol += 1 << 8;
+
+        do
+        {
+            match_byte <<= 1;
+            const uint32_t match_bit = match_byte & offset;
+            const uint32_t subcoder_index
+                    = offset + match_bit + (symbol >> 8);
+            const uint32_t b = (symbol >> 7) & 1;
+            bit(&subcoder[subcoder_index], b);
+
+            symbol <<= 1;
+            offset &= ~(match_byte ^ symbol);
+
+        } while (symbol < (1 << 16));
+    }
+
+    void RangeEncoder::length(LengthEncoder *lc, const uint32_t pos_state, uint32_t len, const bool fast_mode)
+    {
+        assert(len <= MATCH_LEN_MAX);
+        len -= MATCH_LEN_MIN;
+
+        if (len < LEN_LOW_SYMBOLS) {
+            bit(&lc->choice, 0);
+            bittree(lc->low[pos_state], LEN_LOW_BITS, len);
+        } else {
+            bit( &lc->choice, 1);
+            len -= LEN_LOW_SYMBOLS;
+
+            if (len < LEN_MID_SYMBOLS) {
+                bit( &lc->choice2, 0);
+                bittree(lc->mid[pos_state], LEN_MID_BITS, len);
+            } else {
+                bit( &lc->choice2, 1);
+                len -= LEN_MID_SYMBOLS;
+                bittree(lc->high, LEN_HIGH_BITS, len);
+            }
+        }
+
+        // Only getoptimum uses the prices so don't update the table when
+        // in fast mode.
+        if (!fast_mode)
+            if (--lc->counters[pos_state] == 0)
+                lc->updatePrices(pos_state);
     }
 }
 
