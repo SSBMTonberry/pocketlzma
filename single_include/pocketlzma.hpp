@@ -16,6 +16,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 namespace plz
 {
@@ -588,7 +589,7 @@ namespace plz
 	 *  The event names are in from STATE_oldest_older_previous. REP means
 	 *  either short or long repeated match, and NONLIT means any non-literal.
 	 */
-	 enum class LzmaState
+	 enum class LzmaState : uint8_t
 	 {
 		 LitLit,
 		 MatchLitLit,
@@ -695,46 +696,61 @@ namespace plz
 		((probs)[(((pos) & (lp_mask)) << (lc)) \
 				+ ((uint32_t)(prev_byte) >> (8U - (lc)))])
 
+	/// \brief      Return if expression doesn't evaluate to LZMA_OK
+	///
+	/// There are several situations where we want to return immediately
+	/// with the value of expr if it isn't LZMA_OK. This macro shortens
+	/// the code a little.
+	#define return_if_error(expr) \
+	do { \
+		const StatusCode ret_ = (expr); \
+		if (ret_ != StatusCode::Ok) \
+			return ret_; \
+	} while (0)
+
 	/// Indicate that the latest state was a literal.
-	#define update_literal(state) \
-		state = ((state) <= STATE_SHORTREP_LIT_LIT \
-				? STATE_LIT_LIT \
-				: ((state) <= STATE_LIT_SHORTREP \
-					? (state) - 3 \
-					: (state) - 6))
+	//#define update_literal(state) \
+	//    state = ((state) <= STATE_SHORTREP_LIT_LIT \
+	//            ? STATE_LIT_LIT \
+	//            : ((state) <= STATE_LIT_SHORTREP \
+	//                ? (state) - 3 \
+	//                : (state) - 6))
 
-	/// Indicate that the latest state was a match.
-	//#define update_match(state) \
-	//    state = ((state) < LIT_STATES ? STATE_LIT_MATCH : STATE_NONLIT_MATCH)
+	/*! Based on the update_literal macro.
+	 * Indicate that the latest state was a literal.
+	 */
+	static inline void UpdateLiteral(LzmaState &state)
+	{
+		uint8_t s = (uint8_t) state;
+		uint8_t STATE_SHORTREP_LIT_LIT = (uint8_t) LzmaState::ShortRepLitLit;
+		uint8_t STATE_LIT_LIT = (uint8_t) LzmaState::LitLit;
+		uint8_t STATE_LIT_SHORTREP = (uint8_t) LzmaState::LitShortRep;
+		uint8_t newS = (s <= STATE_SHORTREP_LIT_LIT) ? STATE_LIT_LIT : ((s <= STATE_LIT_SHORTREP) ? s - 3 : s - 6);
+		state = (LzmaState) newS;
+	}
 
-	/// Indicate that the latest state was a long repeated match.
-	//#define update_long_rep(state) \
-	//    state = ((state) < LIT_STATES ? STATE_LIT_LONGREP : STATE_NONLIT_REP)
-
-	/// Indicate that the latest state was a short match.
-	//#define update_short_rep(state) \
-	//    state = ((state) < LIT_STATES ? STATE_LIT_SHORTREP : STATE_NONLIT_REP)
-
-	/// Test if the previous state was a literal.
-	//#define is_literal_state(state) \
-	//    ((state) < LIT_STATES)
+	/*! Based on get_dist_state - macro to get the index of the appropriate probability array.*/
+	static inline uint32_t GetDistState(uint32_t len)
+	{
+		return (len < (DIST_STATES + MATCH_LEN_MIN)) ? (len - MATCH_LEN_MIN) : (DIST_STATES - 1);
+	}
 
 	/*! Indicate that the latest state was a match. */
 	static inline void UpdateMatch(LzmaState &state)
 	{
-		state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitMatch: LzmaState::NonLitMatch;
+		state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitMatch : LzmaState::NonLitMatch;
 	}
 
 	/*! Indicate that the latest state was a long repeated match. */
 	static inline void UpdateLongRep(LzmaState &state)
 	{
-		state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitLongRep: LzmaState::NonLitRep;
+		state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitLongRep : LzmaState::NonLitRep;
 	}
 
 	/*! Indicate that the latest state was a short match. */
 	static inline void UpdateShortRep(LzmaState &state)
 	{
-		state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitShortRep: LzmaState::NonLitRep;
+		state = ((uint8_t)state < LIT_STATES) ? LzmaState::LitShortRep : LzmaState::NonLitRep;
 	}
 
 	/*! Test if the previous state was a literal. */
@@ -754,6 +770,20 @@ namespace plz
 	{
 		for (uint32_t bt_i = 0; bt_i < (1 << (bit_levels)); ++bt_i)
 		    BitReset((probs)[bt_i]);
+	}
+
+	static inline void LiteralInit(probability (*probs)[LITERAL_CODER_SIZE],
+								   uint32_t lc, uint32_t lp)
+	{
+		assert(lc + lp <= LZMA_LCLP_MAX);
+
+		const uint32_t coders = 1U << (lc + lp);
+
+		for (uint32_t i = 0; i < coders; ++i)
+			for (uint32_t j = 0; j < LITERAL_CODER_SIZE; ++j)
+				BitReset(probs[i][j]);
+
+		return;
 	}
 
 	/*! Find out how many equal bytes the two buffers have.
@@ -938,249 +968,6 @@ namespace plz
 #endif //POCKETLZMA_PRICE_HPP
 
 /*** End of inlined file: Price.hpp ***/
-
-
-/*** Start of inlined file: RangeEncoder.hpp ***/
-//
-// Created by robin on 25.12.2020.
-//
-
-#ifndef POCKETLZMA_RANGEENCODER_HPP
-#define POCKETLZMA_RANGEENCODER_HPP
-
-namespace plz
-{
-	class RangeEncoder
-	{
-		public:
-			/*! Maximum number of symbols that can be put pending into lzma_range_encoder
-				structure between calls to lzma_rc_encode(). For LZMA, 52+5 is enough
-				(match with big distance and length followed by range encoder flush). */
-			static const uint8_t RC_SYMBOLS_MAX {58};
-			enum class Symbol : uint32_t
-			{
-				Bit0,
-				Bit1,
-				Direct0,
-				Direct1,
-				Flush
-			};
-
-			RangeEncoder() = default;
-
-			uint64_t low;
-			uint64_t cacheSize;
-			uint32_t range;
-			uint8_t cache;
-
-			/// Number of symbols in the tables
-			size_t count;
-
-			/// rc_encode()'s position in the tables
-			size_t pos;
-
-			/// Symbols to encode
-			Symbol symbols[RC_SYMBOLS_MAX];
-
-			/// Probabilities associated with RC_BIT_0 or RC_BIT_1
-			probability *probs[RC_SYMBOLS_MAX];
-
-			//Functions
-
-			/*! rc_reset */
-			inline void reset();
-			/*! rc_bit */
-			inline void bit(probability *prob, uint32_t bit);
-			/*! rc_bittree */
-			inline void bittree(probability *probabilities, uint32_t bit_count, uint32_t symbol);
-			/*! rc_bittree_reverse */
-			inline void bittreeReverse(probability *probabilities, uint32_t bit_count, uint32_t symbol);
-			/*! rc_direct */
-			inline void direct(uint32_t value, uint32_t bit_count);
-			/*! rc_flush */
-			inline void flush();
-			/*! rc_shift_low */
-			inline bool shiftLow(uint8_t *out, size_t *out_pos, size_t out_size);
-			/*! rc_encode */
-			inline bool encode(uint8_t *out, size_t *out_pos, size_t out_size);
-			/*! rc_pending */
-			inline uint64_t pending();
-
-			/*! Symbol to int converter*/
-			inline uint32_t sint(Symbol s);
-			/*! Symbol to int converter*/
-			inline Symbol intToSymbol(uint32_t i);
-
-	};
-
-	void RangeEncoder::reset()
-	{
-		low = 0;
-		cacheSize = 1;
-		range = UINT32_MAX;
-		cache = 0;
-		count = 0;
-		pos = 0;
-	}
-
-	void RangeEncoder::bit(probability *prob, uint32_t bit)
-	{
-		symbols[count] = (Symbol) bit;
-		probs[count] = prob;
-		++count;
-	}
-
-	void RangeEncoder::bittree(probability *probabilities, uint32_t bit_count, uint32_t symbol)
-	{
-		uint32_t model_index = 1;
-
-		do {
-			const uint32_t b = (symbol >> --bit_count) & 1;
-			bit(&probabilities[model_index], b);
-			model_index = (model_index << 1) + b;
-		} while (bit_count != 0);
-	}
-
-	void RangeEncoder::bittreeReverse(probability *probabilities, uint32_t bit_count, uint32_t symbol)
-	{
-		uint32_t model_index = 1;
-
-		do {
-			const uint32_t b = symbol & 1;
-			symbol >>= 1;
-			bit(&probabilities[model_index], b);
-			model_index = (model_index << 1) + b;
-		} while (--bit_count != 0);
-	}
-
-	void RangeEncoder::direct(uint32_t value, uint32_t bit_count)
-	{
-		do {
-			symbols[count++] = intToSymbol(sint(Symbol::Direct0) + ((value >> --bit_count) & 1));
-		} while (bit_count != 0);
-	}
-
-	void RangeEncoder::flush()
-	{
-		for (size_t i = 0; i < 5; ++i)
-			symbols[count++] = Symbol::Flush;
-	}
-
-	bool RangeEncoder::shiftLow(uint8_t *out, size_t *out_pos, size_t out_size)
-	{
-		if ((uint32_t)(low) < (uint32_t)(0xFF000000)
-			|| (uint32_t)(low >> 32) != 0) {
-			do {
-				if (*out_pos == out_size)
-					return true;
-
-				out[*out_pos] = cache + (uint8_t)(low >> 32);
-				++*out_pos;
-				cache = 0xFF;
-
-			} while (--cacheSize != 0);
-
-			cache = (low >> 24) & 0xFF;
-		}
-
-		++cacheSize;
-		low = (low & 0x00FFFFFF) << RC_SHIFT_BITS;
-
-		return false;
-	}
-
-	bool RangeEncoder::encode(uint8_t *out, size_t *out_pos, size_t out_size)
-	{
-		assert(count <= RC_SYMBOLS_MAX);
-
-		while (pos < count) {
-			// Normalize
-			if (range < RC_TOP_VALUE) {
-				if (shiftLow(out, out_pos, out_size))
-					return true;
-
-				range <<= RC_SHIFT_BITS;
-			}
-
-			// Encode a bit
-			switch (symbols[pos]) {
-				case Symbol::Bit0: {
-					probability prob = *probs[pos];
-					range = (range >> RC_BIT_MODEL_TOTAL_BITS)
-								* prob;
-					prob += (RC_BIT_MODEL_TOTAL - prob) >> RC_MOVE_BITS;
-					*probs[pos] = prob;
-					break;
-				}
-
-				case Symbol::Bit1: {
-					probability prob = *probs[pos];
-					const uint32_t bound = prob * (range
-							>> RC_BIT_MODEL_TOTAL_BITS);
-					low += bound;
-					range -= bound;
-					prob -= prob >> RC_MOVE_BITS;
-					*probs[pos] = prob;
-					break;
-				}
-
-				case Symbol::Direct0:
-					range >>= 1;
-					break;
-
-				case Symbol::Direct1:
-					range >>= 1;
-					low += range;
-					break;
-
-				case Symbol::Flush:
-					// Prevent further normalizations.
-					range = UINT32_MAX;
-
-					// Flush the last five bytes (see rc_flush()).
-					do {
-						if (shiftLow(out, out_pos, out_size))
-							return true;
-					} while (++pos < count);
-
-					// Reset the range encoder so we are ready to continue
-					// encoding if we weren't finishing the stream.
-					reset();
-					return false;
-
-				default:
-					assert(0);
-					break;
-			}
-
-			++pos;
-		}
-
-		count = 0;
-		pos = 0;
-
-		return false;
-	}
-
-	uint64_t RangeEncoder::pending()
-	{
-		return cacheSize + 5 - 1;
-	}
-
-	uint32_t RangeEncoder::sint(RangeEncoder::Symbol s)
-	{
-		return static_cast<uint32_t>(s);
-	}
-
-	RangeEncoder::Symbol RangeEncoder::intToSymbol(uint32_t i)
-	{
-		return static_cast<RangeEncoder::Symbol>(i);
-	}
-}
-
-#endif //POCKETLZMA_RANGEENCODER_HPP
-
-/*** End of inlined file: RangeEncoder.hpp ***/
 
 
 /*** Start of inlined file: LzmaMatch.hpp ***/
@@ -1670,6 +1457,9 @@ namespace plz
 			uint32_t depth;
 
 			inline bool isLclppbValid() const;
+
+			/*! is_options_valid */
+			inline bool isValid() const;
 	 };
 
 	bool LzmaOptions::isLclppbValid() const
@@ -1681,6 +1471,16 @@ namespace plz
 
 		return false;
 		//return StatusCode::ErrorInLclppbCheckOnLzmaOptions;
+	}
+
+	bool LzmaOptions::isValid() const
+	{
+		// Validate some of the options. LZ encoder validates nice_len too
+		// but we need a valid value here earlier.
+		return isLclppbValid()
+			   && niceLen >= MATCH_LEN_MIN
+			   && niceLen <= MATCH_LEN_MAX
+			   && (mode == Mode::Fast || mode == Mode::Normal);
 	}
 }
 
@@ -1716,7 +1516,32 @@ namespace plz
 			uint32_t backPrev;
 
 			uint32_t backs[REPS];
+
+			/*! make_literal */
+			inline void makeLiteral();
+
+			inline void makeShortRep();
+
+			/*! Based on macro: is_short_rep */
+			inline bool isShortRep();
 	};
+
+	void LzmaOptimal::makeLiteral()
+	{
+		backPrev = UINT32_MAX;
+		prev1IsLiteral = false;
+	}
+
+	void LzmaOptimal::makeShortRep()
+	{
+		backPrev = 0;
+		prev1IsLiteral = false;
+	}
+
+	bool LzmaOptimal::isShortRep()
+	{
+		return backPrev == 0;
+	}
 }
 
 #endif //POCKETLZMA_LZMAOPTIMAL_HPP
@@ -1751,8 +1576,8 @@ namespace plz
 
 			/*! length_encoder_reset */
 			inline void reset(const uint32_t num_pos_states, const bool fast_mode);
-
-		private:
+			/*! get_len_price */
+			inline uint32_t getLenPrice(const uint32_t len, const uint32_t pos_state);
 			/*! length_update_prices */
 			inline void updatePrices(const uint32_t pos_state);
 	};
@@ -1802,11 +1627,313 @@ namespace plz
 											  i - LEN_LOW_SYMBOLS - LEN_MID_SYMBOLS);
 
 	}
+
+	uint32_t LengthEncoder::getLenPrice(const uint32_t len, const uint32_t pos_state)
+	{
+		// NOTE: Unlike the other price tables, length prices are updated
+		// in lzma_encoder.c
+		return prices[pos_state][len - MATCH_LEN_MIN];
+	}
 }
 
 #endif //POCKETLZMA_LENGTHENCODER_HPP
 
 /*** End of inlined file: LengthEncoder.hpp ***/
+
+
+/*** Start of inlined file: RangeEncoder.hpp ***/
+//
+// Created by robin on 25.12.2020.
+//
+
+#ifndef POCKETLZMA_RANGEENCODER_HPP
+#define POCKETLZMA_RANGEENCODER_HPP
+
+namespace plz
+{
+	class RangeEncoder
+	{
+		public:
+			/*! Maximum number of symbols that can be put pending into lzma_range_encoder
+				structure between calls to lzma_rc_encode(). For LZMA, 52+5 is enough
+				(match with big distance and length followed by range encoder flush). */
+			static const uint8_t RC_SYMBOLS_MAX {58};
+			enum class Symbol : uint32_t
+			{
+				Bit0,
+				Bit1,
+				Direct0,
+				Direct1,
+				Flush
+			};
+
+			RangeEncoder() = default;
+
+			uint64_t low;
+			uint64_t cacheSize;
+			uint32_t range;
+			uint8_t cache;
+
+			/// Number of symbols in the tables
+			size_t count;
+
+			/// rc_encode()'s position in the tables
+			size_t pos;
+
+			/// Symbols to encode
+			Symbol symbols[RC_SYMBOLS_MAX];
+
+			/// Probabilities associated with RC_BIT_0 or RC_BIT_1
+			probability *probs[RC_SYMBOLS_MAX];
+
+			//Functions
+
+			/*! rc_reset */
+			inline void reset();
+			/*! rc_bit */
+			inline void bit(probability *prob, uint32_t bit);
+			/*! rc_bittree */
+			inline void bittree(probability *probabilities, uint32_t bit_count, uint32_t symbol);
+			/*! rc_bittree_reverse */
+			inline void bittreeReverse(probability *probabilities, uint32_t bit_count, uint32_t symbol);
+			/*! rc_direct */
+			inline void direct(uint32_t value, uint32_t bit_count);
+			/*! rc_flush */
+			inline void flush();
+			/*! rc_shift_low */
+			inline bool shiftLow(uint8_t *out, size_t *out_pos, size_t out_size);
+			/*! rc_encode */
+			inline bool encode(uint8_t *out, size_t *out_pos, size_t out_size);
+			/*! rc_pending */
+			inline uint64_t pending();
+			/*! literal_matched */
+			inline void literalMatched(probability *subcoder, uint32_t match_byte, uint32_t symbol);
+			inline void length(LengthEncoder *lc, const uint32_t pos_state, uint32_t len, const bool fast_mode);
+
+			/*! Symbol to int converter*/
+			inline uint32_t sint(Symbol s);
+			/*! Symbol to int converter*/
+			inline Symbol intToSymbol(uint32_t i);
+
+	};
+
+	void RangeEncoder::reset()
+	{
+		low = 0;
+		cacheSize = 1;
+		range = UINT32_MAX;
+		cache = 0;
+		count = 0;
+		pos = 0;
+	}
+
+	void RangeEncoder::bit(probability *prob, uint32_t bit)
+	{
+		symbols[count] = (Symbol) bit;
+		probs[count] = prob;
+		++count;
+	}
+
+	void RangeEncoder::bittree(probability *probabilities, uint32_t bit_count, uint32_t symbol)
+	{
+		uint32_t model_index = 1;
+
+		do {
+			const uint32_t b = (symbol >> --bit_count) & 1;
+			bit(&probabilities[model_index], b);
+			model_index = (model_index << 1) + b;
+		} while (bit_count != 0);
+	}
+
+	void RangeEncoder::bittreeReverse(probability *probabilities, uint32_t bit_count, uint32_t symbol)
+	{
+		uint32_t model_index = 1;
+
+		do {
+			const uint32_t b = symbol & 1;
+			symbol >>= 1;
+			bit(&probabilities[model_index], b);
+			model_index = (model_index << 1) + b;
+		} while (--bit_count != 0);
+	}
+
+	void RangeEncoder::direct(uint32_t value, uint32_t bit_count)
+	{
+		do {
+			symbols[count++] = intToSymbol(sint(Symbol::Direct0) + ((value >> --bit_count) & 1));
+		} while (bit_count != 0);
+	}
+
+	void RangeEncoder::flush()
+	{
+		for (size_t i = 0; i < 5; ++i)
+			symbols[count++] = Symbol::Flush;
+	}
+
+	bool RangeEncoder::shiftLow(uint8_t *out, size_t *out_pos, size_t out_size)
+	{
+		if ((uint32_t)(low) < (uint32_t)(0xFF000000)
+			|| (uint32_t)(low >> 32) != 0) {
+			do {
+				if (*out_pos == out_size)
+					return true;
+
+				out[*out_pos] = cache + (uint8_t)(low >> 32);
+				++*out_pos;
+				cache = 0xFF;
+
+			} while (--cacheSize != 0);
+
+			cache = (low >> 24) & 0xFF;
+		}
+
+		++cacheSize;
+		low = (low & 0x00FFFFFF) << RC_SHIFT_BITS;
+
+		return false;
+	}
+
+	bool RangeEncoder::encode(uint8_t *out, size_t *out_pos, size_t out_size)
+	{
+		assert(count <= RC_SYMBOLS_MAX);
+
+		while (pos < count) {
+			// Normalize
+			if (range < RC_TOP_VALUE) {
+				if (shiftLow(out, out_pos, out_size))
+					return true;
+
+				range <<= RC_SHIFT_BITS;
+			}
+
+			// Encode a bit
+			switch (symbols[pos]) {
+				case Symbol::Bit0: {
+					probability prob = *probs[pos];
+					range = (range >> RC_BIT_MODEL_TOTAL_BITS)
+								* prob;
+					prob += (RC_BIT_MODEL_TOTAL - prob) >> RC_MOVE_BITS;
+					*probs[pos] = prob;
+					break;
+				}
+
+				case Symbol::Bit1: {
+					probability prob = *probs[pos];
+					const uint32_t bound = prob * (range
+							>> RC_BIT_MODEL_TOTAL_BITS);
+					low += bound;
+					range -= bound;
+					prob -= prob >> RC_MOVE_BITS;
+					*probs[pos] = prob;
+					break;
+				}
+
+				case Symbol::Direct0:
+					range >>= 1;
+					break;
+
+				case Symbol::Direct1:
+					range >>= 1;
+					low += range;
+					break;
+
+				case Symbol::Flush:
+					// Prevent further normalizations.
+					range = UINT32_MAX;
+
+					// Flush the last five bytes (see rc_flush()).
+					do {
+						if (shiftLow(out, out_pos, out_size))
+							return true;
+					} while (++pos < count);
+
+					// Reset the range encoder so we are ready to continue
+					// encoding if we weren't finishing the stream.
+					reset();
+					return false;
+
+				default:
+					assert(0);
+					break;
+			}
+
+			++pos;
+		}
+
+		count = 0;
+		pos = 0;
+
+		return false;
+	}
+
+	uint64_t RangeEncoder::pending()
+	{
+		return cacheSize + 5 - 1;
+	}
+
+	uint32_t RangeEncoder::sint(RangeEncoder::Symbol s)
+	{
+		return static_cast<uint32_t>(s);
+	}
+
+	RangeEncoder::Symbol RangeEncoder::intToSymbol(uint32_t i)
+	{
+		return static_cast<RangeEncoder::Symbol>(i);
+	}
+
+	void RangeEncoder::literalMatched(probability *subcoder, uint32_t match_byte, uint32_t symbol)
+	{
+		uint32_t offset = 0x100;
+		symbol += 1 << 8;
+
+		do
+		{
+			match_byte <<= 1;
+			const uint32_t match_bit = match_byte & offset;
+			const uint32_t subcoder_index
+					= offset + match_bit + (symbol >> 8);
+			const uint32_t b = (symbol >> 7) & 1;
+			bit(&subcoder[subcoder_index], b);
+
+			symbol <<= 1;
+			offset &= ~(match_byte ^ symbol);
+
+		} while (symbol < (1 << 16));
+	}
+
+	void RangeEncoder::length(LengthEncoder *lc, const uint32_t pos_state, uint32_t len, const bool fast_mode)
+	{
+		assert(len <= MATCH_LEN_MAX);
+		len -= MATCH_LEN_MIN;
+
+		if (len < LEN_LOW_SYMBOLS) {
+			bit(&lc->choice, 0);
+			bittree(lc->low[pos_state], LEN_LOW_BITS, len);
+		} else {
+			bit( &lc->choice, 1);
+			len -= LEN_LOW_SYMBOLS;
+
+			if (len < LEN_MID_SYMBOLS) {
+				bit( &lc->choice2, 0);
+				bittree(lc->mid[pos_state], LEN_MID_BITS, len);
+			} else {
+				bit( &lc->choice2, 1);
+				len -= LEN_MID_SYMBOLS;
+				bittree(lc->high, LEN_HIGH_BITS, len);
+			}
+		}
+
+		// Only getoptimum uses the prices so don't update the table when
+		// in fast mode.
+		if (!fast_mode)
+			if (--lc->counters[pos_state] == 0)
+				lc->updatePrices(pos_state);
+	}
+}
+
+#endif //POCKETLZMA_RANGEENCODER_HPP
+
+/*** End of inlined file: RangeEncoder.hpp ***/
 
 
 /*** Start of inlined file: Lzma1Encoder.hpp ***/
@@ -1891,6 +2018,15 @@ namespace plz
 			/*! encode_init */
 			inline bool init(LzmaMF *mf);
 
+			/*! lzma_lzma_encoder_reset */
+			StatusCode reset(const LzmaOptions *options);
+
+			/*! encode_symbol */
+			inline void encodeSymbol(LzmaMF *mf, uint32_t back, uint32_t len, uint32_t position);
+
+			/*! encode_eopm */
+			inline void encodeEopm(uint32_t position);
+
 			/*! lzma_lzma_optimum_normal */
 			inline void lzmaOptimumNormal(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position);
 
@@ -1907,17 +2043,41 @@ namespace plz
 			/*! helper1
 			 *  A horrible function doing something important.
 			 * */
-			inline uint32_t helper1(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position);
+			inline uint32_t optimumNormalHelper1(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position);
 
 			/*! helper2
 			 *  Another horrible function doing something important.*/
-			inline uint32_t helper2(uint32_t *reps, const uint8_t *buf,
-					uint32_t len_end, uint32_t position, const uint32_t cur,
-					const uint32_t nice_len, const uint32_t buf_avail_full);
+			inline uint32_t optimumNormalHelper2(uint32_t *reps, const uint8_t *buf,
+												 uint32_t len_end, uint32_t position, const uint32_t cur,
+												 const uint32_t nice_len, const uint32_t buf_avail_full);
 
 			/*! get_literal_price */
 			inline uint32_t getLiteralPrice(const uint32_t pos, const uint32_t prev_byte, const bool match_mode,
 							  uint32_t match_byte, uint32_t symbol);
+
+			/*! get_short_rep_price */
+			inline uint32_t getShortRepPrice(const LzmaState state, const uint32_t pos_state);
+
+			/*! get_pure_rep_price */
+			inline uint32_t getPureRepPrice(const uint32_t rep_index, const LzmaState state, uint32_t pos_state);
+
+			/*! get_rep_price */
+			inline uint32_t getRepPrice(const uint32_t rep_index, const uint32_t len, const LzmaState state,
+						  const uint32_t pos_state);
+
+			/*! get_dist_len_price */
+			inline uint32_t getDistLenPrice(const uint32_t dist, const uint32_t len, const uint32_t pos_state);
+
+			inline void backward(uint32_t * len_res, uint32_t * back_res, uint32_t cur);
+
+			/*! literal
+			 *  Named literalFunc to not get confused with the variable named "literal"
+			 */
+			inline void literalFunc(LzmaMF *mf, uint32_t position);
+
+			inline void match(const uint32_t pos_state, const uint32_t distance, const uint32_t len);
+			/*! rep_match - Repeated match */
+			inline void repMatch(const uint32_t pos_state, const uint32_t rep, const uint32_t len);
 
 	};
 
@@ -2128,7 +2288,7 @@ namespace plz
 		// the original function into two pieces makes it at least a little
 		// more readable, since those two parts don't share many variables.
 
-		uint32_t len_end = helper1(mf, back_res, len_res, position);
+		uint32_t len_end = optimumNormalHelper1(mf, back_res, len_res, position);
 		if (len_end == UINT32_MAX)
 			return;
 
@@ -2144,12 +2304,12 @@ namespace plz
 			if (longestMatchLength >= mf->niceLen)
 				break;
 
-			len_end = helper2(coder, reps, mf_ptr(mf) - 1, len_end,
-							  position + cur, cur, mf->nice_len,
-							  my_min(mf_avail(mf) + 1, OPTS - 1 - cur));
+			len_end = optimumNormalHelper2(reps, mf->ptr() - 1, len_end,
+										   position + cur, cur, mf->niceLen,
+										   my_min(mf->avail() + 1, OPTS - 1 - cur));
 		}
 
-		backward(coder, len_res, back_res, cur);
+		backward(len_res, back_res, cur);
 	}
 
 	void Lzma1Encoder::fillDistPrices()
@@ -2209,7 +2369,7 @@ namespace plz
 		alignPriceCount = 0;
 	}
 
-	uint32_t Lzma1Encoder::helper1(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position)
+	uint32_t Lzma1Encoder::optimumNormalHelper1(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res, uint32_t position)
 	{
 		const uint32_t nice_len = mf->niceLen;
 
@@ -2250,14 +2410,16 @@ namespace plz
 				rep_max_index = i;
 		}
 
-		if (rep_lens[rep_max_index] >= nice_len) {
+		if (rep_lens[rep_max_index] >= nice_len)
+		{
 			*back_res = rep_max_index;
 			*len_res = rep_lens[rep_max_index];
 			mf->mfSkip(*len_res - 1);
 			return UINT32_MAX;
 		}
 
-		if (len_main >= nice_len) {
+		if (len_main >= nice_len)
+		{
 			*back_res = matches[matches_count - 1].dist + REPS;
 			*len_res = len_main;
 			mf->mfSkip(len_main - 1);
@@ -2268,7 +2430,8 @@ namespace plz
 		const uint8_t match_byte = *(buf - reps[0] - 1);
 
 		if (len_main < 2 && current_byte != match_byte
-			&& rep_lens[rep_max_index] < 2) {
+			&& rep_lens[rep_max_index] < 2)
+		{
 			*back_res = UINT32_MAX;
 			*len_res = 1;
 			return UINT32_MAX;
@@ -2278,24 +2441,21 @@ namespace plz
 
 		const uint32_t pos_state = position & posMask;
 
-		opts[1].price = Price::RcBit0Price(isMatch[state][pos_state])
-							   + getLiteralPrice(position, buf[-1], !is_literal_state(state), match_byte, current_byte);
+		opts[1].price = Price::RcBit0Price(isMatch[(uint8_t)state][pos_state])
+							   + getLiteralPrice(position, buf[-1], !IsLiteralState(state), match_byte, current_byte);
 
-		make_literal(&opts[1]);
+		opts[1].makeLiteral();
 
-		const uint32_t match_price = rc_bit_1_price(
-				is_match[state][pos_state]);
-		const uint32_t rep_match_price = match_price
-										 + rc_bit_1_price(is_rep[state]);
+		const uint32_t match_price = Price::RcBit1Price(isMatch[(uint8_t)state][pos_state]);
+		const uint32_t rep_match_price = match_price + Price::RcBit1Price(isRep[(uint8_t)state]);
 
-		if (match_byte == current_byte) {
-			const uint32_t short_rep_price = rep_match_price
-											 + get_short_rep_price(
-					coder, state, pos_state);
+		if (match_byte == current_byte)
+		{
+			const uint32_t short_rep_price = rep_match_price + getShortRepPrice(state, pos_state);
 
 			if (short_rep_price < opts[1].price) {
 				opts[1].price = short_rep_price;
-				make_short_rep(&opts[1]);
+				opts[1].makeShortRep();
 			}
 		}
 
@@ -2322,26 +2482,22 @@ namespace plz
 			if (rep_len < 2)
 				continue;
 
-			const uint32_t price = rep_match_price + get_pure_rep_price(
-					coder, i, state, pos_state);
+			const uint32_t price = rep_match_price + getPureRepPrice(i, state, pos_state);
 
 			do {
-				const uint32_t cur_and_len_price = price
-												   + get_len_price(
-						&rep_len_encoder,
-						rep_len, pos_state);
+				const uint32_t cur_and_len_price = price + repLenEncoder.getLenPrice(rep_len, pos_state);
 
 				if (cur_and_len_price < opts[rep_len].price) {
 					opts[rep_len].price = cur_and_len_price;
-					opts[rep_len].pos_prev = 0;
-					opts[rep_len].back_prev = i;
-					opts[rep_len].prev_1_is_literal = false;
+					opts[rep_len].posPrev = 0;
+					opts[rep_len].backPrev = i;
+					opts[rep_len].prev1IsLiteral = false;
 				}
 			} while (--rep_len >= 2);
 		}
 
 		const uint32_t normal_match_price = match_price
-											+ rc_bit_0_price(is_rep[state]);
+											+ Price::RcBit0Price(isRep[(uint8_t)state]);
 
 		len = rep_lens[0] >= 2 ? rep_lens[0] + 1 : 2;
 		if (len <= len_main) {
@@ -2352,14 +2508,13 @@ namespace plz
 			for(; ; ++len) {
 				const uint32_t dist = matches[i].dist;
 				const uint32_t cur_and_len_price = normal_match_price
-												   + get_dist_len_price(coder,
-																		dist, len, pos_state);
+												   + getDistLenPrice(dist, len, pos_state);
 
 				if (cur_and_len_price < opts[len].price) {
 					opts[len].price = cur_and_len_price;
-					opts[len].pos_prev = 0;
-					opts[len].back_prev = dist + REPS;
-					opts[len].prev_1_is_literal = false;
+					opts[len].posPrev = 0;
+					opts[len].backPrev = dist + REPS;
+					opts[len].prev1IsLiteral = false;
 				}
 
 				if (len == matches[i].len)
@@ -2401,15 +2556,16 @@ namespace plz
 		return price;
 	}
 
-	uint32_t Lzma1Encoder::helper2(uint32_t *reps, const uint8_t *buf, uint32_t len_end, uint32_t position, const uint32_t cur, const uint32_t nice_len,
-						  const uint32_t buf_avail_full)
+	uint32_t Lzma1Encoder::optimumNormalHelper2(uint32_t *reps, const uint8_t *buf, uint32_t len_end, uint32_t position, const uint32_t cur, const uint32_t nice_len,
+												const uint32_t buf_avail_full)
 	{
 		uint32_t matches_count = matches_count;
 		uint32_t new_len = longestMatchLength;
 		uint32_t pos_prev = opts[cur].posPrev;
 		LzmaState lzmaState;
 
-		if (opts[cur].prev1IsLiteral) {
+		if (opts[cur].prev1IsLiteral)
+		{
 			--pos_prev;
 
 			if (opts[cur].prev2) {
@@ -2424,18 +2580,23 @@ namespace plz
 				lzmaState = opts[pos_prev].state;
 			}
 
-			update_literal(lzmaState);
+			UpdateLiteral(lzmaState);
 
-		} else {
+		}
+		else
+		{
 			lzmaState = opts[pos_prev].state;
 		}
 
-		if (pos_prev == cur - 1) {
-			if (is_short_rep(opts[cur]))
+		if (pos_prev == cur - 1)
+		{
+			if (opts[cur].isShortRep())
 				UpdateShortRep(lzmaState);
 			else
-				update_literal(lzmaState);
-		} else {
+				UpdateLiteral(lzmaState);
+		}
+		else
+		{
 			uint32_t pos;
 			if (opts[cur].prev1IsLiteral
 				&& opts[cur].prev2)
@@ -2487,33 +2648,34 @@ namespace plz
 		const uint32_t cur_and_1_price = cur_price
 										 + Price::RcBit0Price(isMatch[(uint8_t)lzmaState][pos_state])
 										 + getLiteralPrice(position, buf[-1],
-															 !is_literal_state(lzmaState), match_byte, current_byte);
+															 !IsLiteralState(lzmaState), match_byte, current_byte);
 
 		bool next_is_literal = false;
 
 		if (cur_and_1_price < opts[cur + 1].price) {
 			opts[cur + 1].price = cur_and_1_price;
-			opts[cur + 1].pos_prev = cur;
-			make_literal(&opts[cur + 1]);
+			opts[cur + 1].posPrev = cur;
+			opts[cur + 1].makeLiteral();
 			next_is_literal = true;
 		}
 
 		const uint32_t match_price = cur_price
-									 + rc_bit_1_price(is_match[lzmaState][pos_state]);
+									 + Price::RcBit1Price(isMatch[(uint8_t)lzmaState][pos_state]);
 		const uint32_t rep_match_price = match_price
-										 + rc_bit_1_price(is_rep[lzmaState]);
+										 + Price::RcBit1Price(isRep[(uint8_t)lzmaState]);
 
 		if (match_byte == current_byte
-			&& !(opts[cur + 1].pos_prev < cur
-				 && opts[cur + 1].back_prev == 0)) {
+			&& !(opts[cur + 1].posPrev < cur
+				 && opts[cur + 1].backPrev == 0))
+		{
 
-			const uint32_t short_rep_price = rep_match_price
-											 + get_short_rep_price(coder, lzmaState, pos_state);
+			const uint32_t short_rep_price = rep_match_price + getShortRepPrice(lzmaState, pos_state);
 
-			if (short_rep_price <= opts[cur + 1].price) {
+			if (short_rep_price <= opts[cur + 1].price)
+			{
 				opts[cur + 1].price = short_rep_price;
-				opts[cur + 1].pos_prev = cur;
-				make_short_rep(&opts[cur + 1]);
+				opts[cur + 1].posPrev = cur;
+				opts[cur + 1].makeShortRep();
 				next_is_literal = true;
 			}
 		}
@@ -2528,16 +2690,17 @@ namespace plz
 			const uint8_t *const buf_back = buf - reps[0] - 1;
 			const uint32_t limit = my_min(buf_avail_full, nice_len + 1);
 
-			const uint32_t len_test = lzma_memcmplen(buf, buf_back, 1, limit) - 1;
+			const uint32_t len_test = LzmaMemcmplen(buf, buf_back, 1, limit) - 1;
 
-			if (len_test >= 2) {
-				lzma_lzma_state state_2 = lzmaState;
-				update_literal(state_2);
+			if (len_test >= 2)
+			{
+				LzmaState state_2 = lzmaState;
+				UpdateLiteral(state_2);
 
-				const uint32_t pos_state_next = (position + 1) & pos_mask;
+				const uint32_t pos_state_next = (position + 1) & posMask;
 				const uint32_t next_rep_match_price = cur_and_1_price
-													  + rc_bit_1_price(is_match[state_2][pos_state_next])
-													  + rc_bit_1_price(is_rep[state_2]);
+													  + Price::RcBit1Price(isMatch[(uint8_t)state_2][pos_state_next])
+													  + Price::RcBit1Price(isRep[(uint8_t)state_2]);
 
 				//for (; len_test >= 2; --len_test) {
 				const uint32_t offset = cur + 1 + len_test;
@@ -2546,15 +2709,15 @@ namespace plz
 					opts[++len_end].price = RC_INFINITY_PRICE;
 
 				const uint32_t cur_and_len_price = next_rep_match_price
-												   + get_rep_price(coder, 0, len_test,
-																   state_2, pos_state_next);
+												   + getRepPrice(0, len_test, state_2, pos_state_next);
 
-				if (cur_and_len_price < opts[offset].price) {
+				if (cur_and_len_price < opts[offset].price)
+				{
 					opts[offset].price = cur_and_len_price;
-					opts[offset].pos_prev = cur + 1;
-					opts[offset].back_prev = 0;
-					opts[offset].prev_1_is_literal = true;
-					opts[offset].prev_2 = false;
+					opts[offset].posPrev = cur + 1;
+					opts[offset].backPrev = 0;
+					opts[offset].prev1IsLiteral = true;
+					opts[offset].prev2 = false;
 				}
 				//}
 			}
@@ -2567,25 +2730,23 @@ namespace plz
 			if (not_equal_16(buf, buf_back))
 				continue;
 
-			uint32_t len_test = lzma_memcmplen(buf, buf_back, 2, buf_avail);
+			uint32_t len_test = LzmaMemcmplen(buf, buf_back, 2, buf_avail);
 
 			while (len_end < cur + len_test)
 				opts[++len_end].price = RC_INFINITY_PRICE;
 
 			const uint32_t len_test_temp = len_test;
-			const uint32_t price = rep_match_price + get_pure_rep_price(
-					coder, rep_index, lzmaState, pos_state);
+			const uint32_t price = rep_match_price + getPureRepPrice(rep_index, lzmaState, pos_state);
 
-			do {
-				const uint32_t cur_and_len_price = price
-												   + get_len_price(&rep_len_encoder,
-																   len_test, pos_state);
+			do
+			{
+				const uint32_t cur_and_len_price = price + repLenEncoder.getLenPrice(len_test, pos_state);
 
 				if (cur_and_len_price < opts[cur + len_test].price) {
 					opts[cur + len_test].price = cur_and_len_price;
-					opts[cur + len_test].pos_prev = cur;
-					opts[cur + len_test].back_prev = rep_index;
-					opts[cur + len_test].prev_1_is_literal = false;
+					opts[cur + len_test].posPrev = cur;
+					opts[cur + len_test].backPrev = rep_index;
+					opts[cur + len_test].prev1IsLiteral = false;
 				}
 			} while (--len_test >= 2);
 
@@ -2600,57 +2761,55 @@ namespace plz
 			// NOTE: len_test_2 may be greater than limit so the call to
 			// lzma_memcmplen() must be done conditionally.
 			if (len_test_2 < limit)
-				len_test_2 = lzma_memcmplen(buf, buf_back, len_test_2, limit);
+				len_test_2 = LzmaMemcmplen(buf, buf_back, len_test_2, limit);
 
 			len_test_2 -= len_test + 1;
 
-			if (len_test_2 >= 2) {
-				lzma_lzma_state state_2 = lzmaState;
-				update_long_rep(state_2);
+			if (len_test_2 >= 2)
+			{
+				LzmaState state_2 = lzmaState;
+				UpdateLongRep(state_2);
 
-				uint32_t pos_state_next = (position + len_test) & pos_mask;
+				uint32_t pos_state_next = (position + len_test) & posMask;
 
 				const uint32_t cur_and_len_literal_price = price
-														   + get_len_price(&rep_len_encoder,
-																		   len_test, pos_state)
-														   + rc_bit_0_price(is_match[state_2][pos_state_next])
-														   + get_literal_price(coder, position + len_test,
+														   + repLenEncoder.getLenPrice(len_test, pos_state)
+														   + Price::RcBit0Price(isMatch[(uint8_t)state_2][pos_state_next])
+														   + getLiteralPrice(position + len_test,
 																			   buf[len_test - 1], true,
 																			   buf_back[len_test], buf[len_test]);
 
-				update_literal(state_2);
+				UpdateLiteral(state_2);
 
-				pos_state_next = (position + len_test + 1) & pos_mask;
+				pos_state_next = (position + len_test + 1) & posMask;
 
 				const uint32_t next_rep_match_price = cur_and_len_literal_price
-													  + rc_bit_1_price(is_match[state_2][pos_state_next])
-													  + rc_bit_1_price(is_rep[state_2]);
+													  + Price::RcBit1Price(isMatch[(uint8_t)state_2][pos_state_next])
+													  + Price::RcBit1Price(isRep[(uint8_t)state_2]);
 
-				//for(; len_test_2 >= 2; len_test_2--) {
 				const uint32_t offset = cur + len_test + 1 + len_test_2;
 
 				while (len_end < offset)
 					opts[++len_end].price = RC_INFINITY_PRICE;
 
 				const uint32_t cur_and_len_price = next_rep_match_price
-												   + get_rep_price(coder, 0, len_test_2,
-																   state_2, pos_state_next);
+												   + getRepPrice(0, len_test_2, state_2, pos_state_next);
 
-				if (cur_and_len_price < opts[offset].price) {
+				if (cur_and_len_price < opts[offset].price)
+				{
 					opts[offset].price = cur_and_len_price;
-					opts[offset].pos_prev = cur + len_test + 1;
-					opts[offset].back_prev = 0;
-					opts[offset].prev_1_is_literal = true;
-					opts[offset].prev_2 = true;
-					opts[offset].pos_prev_2 = cur;
-					opts[offset].back_prev_2 = rep_index;
+					opts[offset].posPrev = cur + len_test + 1;
+					opts[offset].backPrev = 0;
+					opts[offset].prev1IsLiteral = true;
+					opts[offset].prev2 = true;
+					opts[offset].posPrev2 = cur;
+					opts[offset].backPrev2 = rep_index;
 				}
-				//}
 			}
 		}
 
-		//for (uint32_t len_test = 2; len_test <= new_len; ++len_test)
-		if (new_len > buf_avail) {
+		if (new_len > buf_avail)
+		{
 			new_len = buf_avail;
 
 			matches_count = 0;
@@ -2660,9 +2819,9 @@ namespace plz
 			matches[matches_count++].len = new_len;
 		}
 
-		if (new_len >= start_len) {
-			const uint32_t normal_match_price = match_price
-												+ rc_bit_0_price(is_rep[lzmaState]);
+		if (new_len >= start_len)
+		{
+			const uint32_t normal_match_price = match_price + Price::RcBit0Price(isRep[(uint8_t)lzmaState]);
 
 			while (len_end < cur + new_len)
 				opts[++len_end].price = RC_INFINITY_PRICE;
@@ -2671,18 +2830,18 @@ namespace plz
 			while (start_len > matches[i].len)
 				++i;
 
-			for (uint32_t len_test = start_len; ; ++len_test) {
+			for (uint32_t len_test = start_len; ; ++len_test)
+			{
 				const uint32_t cur_back = matches[i].dist;
 				uint32_t cur_and_len_price = normal_match_price
-											 + get_dist_len_price(coder,
-																  cur_back, len_test, pos_state);
+											 + getDistLenPrice(cur_back, len_test, pos_state);
 
 				if (cur_and_len_price < opts[cur + len_test].price) {
 					opts[cur + len_test].price = cur_and_len_price;
-					opts[cur + len_test].pos_prev = cur;
-					opts[cur + len_test].back_prev
+					opts[cur + len_test].posPrev = cur;
+					opts[cur + len_test].backPrev
 							= cur_back + REPS;
-					opts[cur + len_test].prev_1_is_literal = false;
+					opts[cur + len_test].prev1IsLiteral = false;
 				}
 
 				if (len_test == matches[i].len) {
@@ -2696,35 +2855,32 @@ namespace plz
 					// so the call to lzma_memcmplen() must be
 					// done conditionally.
 					if (len_test_2 < limit)
-						len_test_2 = lzma_memcmplen(buf, buf_back,
-													len_test_2, limit);
+						len_test_2 = LzmaMemcmplen(buf, buf_back, len_test_2, limit);
 
 					len_test_2 -= len_test + 1;
 
-					if (len_test_2 >= 2) {
-						lzma_lzma_state state_2 = lzmaState;
-						update_match(state_2);
+					if (len_test_2 >= 2)
+					{
+						LzmaState state_2 = lzmaState;
+						UpdateMatch(state_2);
 						uint32_t pos_state_next
-								= (position + len_test) & pos_mask;
+								= (position + len_test) & posMask;
 
 						const uint32_t cur_and_len_literal_price = cur_and_len_price
-																   + rc_bit_0_price(
-								is_match[state_2][pos_state_next])
-																   + get_literal_price(coder,
-																					   position + len_test,
+																   + Price::RcBit0Price(isMatch[(uint8_t)state_2][pos_state_next])
+																   + getLiteralPrice(position + len_test,
 																					   buf[len_test - 1],
 																					   true,
 																					   buf_back[len_test],
 																					   buf[len_test]);
 
-						update_literal(state_2);
-						pos_state_next = (pos_state_next + 1) & pos_mask;
+						UpdateLiteral(state_2);
+						pos_state_next = (pos_state_next + 1) & posMask;
 
 						const uint32_t next_rep_match_price
 								= cur_and_len_literal_price
-								  + rc_bit_1_price(
-										is_match[state_2][pos_state_next])
-								  + rc_bit_1_price(is_rep[state_2]);
+								  + Price::RcBit1Price(isMatch[(uint8_t)state_2][pos_state_next])
+								  + Price::RcBit1Price(isRep[(uint8_t)state_2]);
 
 						// for(; len_test_2 >= 2; --len_test_2) {
 						const uint32_t offset = cur + len_test + 1 + len_test_2;
@@ -2733,20 +2889,19 @@ namespace plz
 							opts[++len_end].price = RC_INFINITY_PRICE;
 
 						cur_and_len_price = next_rep_match_price
-											+ get_rep_price(coder, 0, len_test_2,
-															state_2, pos_state_next);
+											+ getRepPrice(0, len_test_2, state_2, pos_state_next);
 
-						if (cur_and_len_price < opts[offset].price) {
+						if (cur_and_len_price < opts[offset].price)
+						{
 							opts[offset].price = cur_and_len_price;
-							opts[offset].pos_prev = cur + len_test + 1;
-							opts[offset].back_prev = 0;
-							opts[offset].prev_1_is_literal = true;
-							opts[offset].prev_2 = true;
-							opts[offset].pos_prev_2 = cur;
-							opts[offset].back_prev_2
-									= cur_back + REPS;
+							opts[offset].posPrev = cur + len_test + 1;
+							opts[offset].backPrev = 0;
+							opts[offset].prev1IsLiteral = true;
+							opts[offset].prev2 = true;
+							opts[offset].posPrev2 = cur;
+							opts[offset].backPrev2 = cur_back + REPS;
 						}
-						//}
+
 					}
 
 					if (++i == matches_count)
@@ -2756,6 +2911,316 @@ namespace plz
 		}
 
 		return len_end;
+	}
+
+	uint32_t Lzma1Encoder::getShortRepPrice(const LzmaState state, const uint32_t pos_state)
+	{
+		return Price::RcBit0Price(isRep0[(uint8_t)state])
+			   + Price::RcBit0Price(isRep0Long[(uint8_t)state][pos_state]);
+	}
+
+	uint32_t Lzma1Encoder::getPureRepPrice(const uint32_t rep_index, const LzmaState state, uint32_t pos_state)
+	{
+		uint32_t price;
+
+		if (rep_index == 0) {
+			price = Price::RcBit0Price(isRep0[(uint8_t)state]);
+			price += Price::RcBit1Price(isRep0Long[(uint8_t)state][pos_state]);
+		} else {
+			price = Price::RcBit1Price(isRep0[(uint8_t)state]);
+
+			if (rep_index == 1) {
+				price += Price::RcBit0Price(isRep1[(uint8_t)state]);
+			} else {
+				price += Price::RcBit1Price(isRep1[(uint8_t)state]);
+				price += Price::RcBitPrice(isRep2[(uint8_t)state],
+									  rep_index - 2);
+			}
+		}
+
+		return price;
+	}
+
+	uint32_t Lzma1Encoder::getRepPrice(const uint32_t rep_index, const uint32_t len, const LzmaState state, const uint32_t pos_state)
+	{
+		return repLenEncoder.getLenPrice(len, pos_state)
+			   + getPureRepPrice(rep_index, state, pos_state);
+	}
+
+	uint32_t Lzma1Encoder::getDistLenPrice(const uint32_t dist, const uint32_t len, const uint32_t pos_state)
+	{
+
+		const uint32_t dist_state = GetDistState(len);
+		uint32_t price;
+
+		if (dist < FULL_DISTANCES) {
+			price = distPrices[dist_state][dist];
+		} else {
+			const uint32_t dist_slot = GetDistSlot2(dist);
+			price = distSlotPrices[dist_state][dist_slot]
+					+ alignPrices[dist & ALIGN_MASK];
+		}
+
+		price += matchLenEncoder.getLenPrice(len, pos_state);
+
+		return price;
+	}
+
+	void Lzma1Encoder::backward(uint32_t *len_res, uint32_t *back_res, uint32_t cur)
+	{
+		optsEndIndex = cur;
+
+		uint32_t pos_mem = opts[cur].posPrev;
+		uint32_t back_mem = opts[cur].backPrev;
+
+		do
+		{
+			if (opts[cur].prev1IsLiteral)
+			{
+				opts[pos_mem].makeLiteral();
+				opts[pos_mem].posPrev = pos_mem - 1;
+
+				if (opts[cur].prev2)
+				{
+					opts[pos_mem - 1].prev1IsLiteral = false;
+					opts[pos_mem - 1].posPrev = opts[cur].posPrev2;
+					opts[pos_mem - 1].backPrev = opts[cur].backPrev2;
+				}
+			}
+
+			const uint32_t pos_prev = pos_mem;
+			const uint32_t back_cur = back_mem;
+
+			back_mem = opts[pos_prev].backPrev;
+			pos_mem = opts[pos_prev].posPrev;
+
+			opts[pos_prev].backPrev = back_cur;
+			opts[pos_prev].posPrev = cur;
+			cur = pos_prev;
+
+		} while (cur != 0);
+
+		optsCurrentIndex = opts[0].posPrev;
+		*len_res = opts[0].posPrev;
+		*back_res = opts[0].backPrev;
+
+		return;
+	}
+
+	void Lzma1Encoder::encodeSymbol(LzmaMF *mf, uint32_t back, uint32_t len, uint32_t position)
+	{
+		const uint32_t pos_state = position & posMask;
+
+		if (back == UINT32_MAX)
+		{
+			// Literal i.e. eight-bit byte
+			assert(len == 1);
+			rc.bit( &isMatch[(uint8_t)state][pos_state], 0);
+			literalFunc(mf, position);
+		}
+		else
+		{
+			// Some type of match
+			rc.bit(&isMatch[(uint8_t)state][pos_state], 1);
+
+			if (back < REPS)
+			{
+				// It's a repeated match i.e. the same distance
+				// has been used earlier.
+				rc.bit(&isRep[(uint8_t)state], 1);
+				repMatch(pos_state, back, len);
+			}
+			else
+			{
+				// Normal match
+				rc.bit(&isRep[(uint8_t)state], 0);
+				match(pos_state, back - REPS, len);
+			}
+		}
+
+		assert(mf->readAhead >= len);
+		mf->readAhead -= len;
+	}
+
+	void Lzma1Encoder::literalFunc(LzmaMF *mf, uint32_t position)
+	{
+		// Locate the literal byte to be encoded and the subcoder.
+		const uint8_t cur_byte = mf->buffer[
+				mf->readPos - mf->readAhead];
+		probability *subcoder = literal_subcoder(literal,
+												 literalContextBits, literalPosMask,
+												 position, mf->buffer[mf->readPos - mf->readAhead - 1]);
+
+		if (IsLiteralState(state))
+		{
+			// Previous LZMA-symbol was a literal. Encode a normal
+			// literal without a match byte.
+			rc.bittree(subcoder, 8, cur_byte);
+		}
+		else
+		{
+			// Previous LZMA-symbol was a match. Use the last byte of
+			// the match as a "match byte". That is, compare the bits
+			// of the current literal and the match byte.
+			const uint8_t match_byte = mf->buffer[
+					mf->readPos - reps[0] - 1
+					- mf->readAhead];
+			rc.literalMatched(subcoder, match_byte, cur_byte);
+		}
+
+		UpdateLiteral(state);
+	}
+
+	void Lzma1Encoder::match(const uint32_t pos_state, const uint32_t distance, const uint32_t len)
+	{
+		UpdateMatch(state);
+
+		rc.length(&matchLenEncoder, pos_state, len, fastMode);
+
+		const uint32_t dist_slot = GetDistSlot(distance);
+		const uint32_t dist_state = GetDistState(len);
+		rc.bittree(distSlot[dist_state], DIST_SLOT_BITS, dist_slot);
+
+		if (dist_slot >= DIST_MODEL_START) {
+			const uint32_t footer_bits = (dist_slot >> 1) - 1;
+			const uint32_t base = (2 | (dist_slot & 1)) << footer_bits;
+			const uint32_t dist_reduced = distance - base;
+
+			if (dist_slot < DIST_MODEL_END)
+			{
+				// Careful here: base - dist_slot - 1 can be -1, but
+				// rc_bittree_reverse starts at probs[1], not probs[0].
+				rc.bittreeReverse(distSpecial + base - dist_slot - 1, footer_bits, dist_reduced);
+			}
+			else
+			{
+				rc.direct(dist_reduced >> ALIGN_BITS, footer_bits - ALIGN_BITS);
+				rc.bittreeReverse(distAlign, ALIGN_BITS, dist_reduced & ALIGN_MASK);
+				++alignPriceCount;
+			}
+		}
+
+		reps[3] = reps[2];
+		reps[2] = reps[1];
+		reps[1] = reps[0];
+		reps[0] = distance;
+		++matchPriceCount;
+	}
+
+	void Lzma1Encoder::repMatch(const uint32_t pos_state, const uint32_t rep, const uint32_t len)
+	{
+		if (rep == 0) {
+			rc.bit(&isRep0[(uint8_t)state], 0);
+			rc.bit(&isRep0Long[(uint8_t)state][pos_state],
+				   len != 1);
+		} else {
+			const uint32_t distance = reps[rep];
+			rc.bit( &isRep0[(uint8_t)state], 1);
+
+			if (rep == 1)
+			{
+				rc.bit(&isRep1[(uint8_t)state], 0);
+			}
+			else
+			{
+				rc.bit(&isRep1[(uint8_t)state], 1);
+				rc.bit(&isRep2[(uint8_t)state], rep - 2);
+
+				if (rep == 3)
+					reps[3] = reps[2];
+
+				reps[2] = reps[1];
+			}
+
+			reps[1] = reps[0];
+			reps[0] = distance;
+		}
+
+		if (len == 1)
+		{
+			UpdateShortRep(state);
+		}
+		else
+		{
+			rc.length(&repLenEncoder, pos_state, len, fastMode);
+			UpdateLongRep(state);
+		}
+	}
+
+	void Lzma1Encoder::encodeEopm(uint32_t position)
+	{
+		const uint32_t pos_state = position & posMask;
+		rc.bit(&isMatch[(uint8_t)state][pos_state], 1);
+		rc.bit(&isRep[(uint8_t)state], 0);
+		match(pos_state, UINT32_MAX, MATCH_LEN_MIN);
+	}
+
+	StatusCode Lzma1Encoder::reset(const LzmaOptions *options)
+	{
+
+		if (!options->isValid())
+			return StatusCode::OptionsError;
+
+		posMask = (1U << options->pb) - 1;
+		literalContextBits = options->lc;
+		literalPosMask = (1U << options->lp) - 1;
+
+		// Range coder
+		rc.reset();
+
+		// State
+		state = LzmaState::LitLit;
+		for (size_t i = 0; i < REPS; ++i)
+			reps[i] = 0;
+
+		LiteralInit(literal, options->lc, options->lp);
+
+		// Bit encoders
+		for (size_t i = 0; i < STATES; ++i) {
+			for (size_t j = 0; j <= posMask; ++j) {
+				BitReset(isMatch[i][j]);
+				BitReset(isRep0Long[i][j]);
+			}
+
+			BitReset(isRep[i]);
+			BitReset(isRep0[i]);
+			BitReset(isRep1[i]);
+			BitReset(isRep2[i]);
+		}
+
+		for (size_t i = 0; i < FULL_DISTANCES - DIST_MODEL_END; ++i)
+			BitReset(distSpecial[i]);
+
+		// Bit tree encoders
+		for (size_t i = 0; i < DIST_STATES; ++i)
+			BittreeReset(distSlot[i], DIST_SLOT_BITS);
+
+		BittreeReset(distAlign, ALIGN_BITS);
+
+		// Length encoders
+		matchLenEncoder.reset(1U << options->pb, fastMode);
+		repLenEncoder.reset(1U << options->pb, fastMode);
+
+		// Price counts are incremented every time appropriate probabilities
+		// are changed. price counts are set to zero when the price tables
+		// are updated, which is done when the appropriate price counts have
+		// big enough value, and lzma_mf.read_ahead == 0 which happens at
+		// least every OPTS (a few thousand) possible price count increments.
+		//
+		// By resetting price counts to UINT32_MAX / 2, we make sure that the
+		// price tables will be initialized before they will be used (since
+		// the value is definitely big enough), and that it is OK to increment
+		// price counts without risk of integer overflow (since UINT32_MAX / 2
+		// is small enough). The current code doesn't increment price counts
+		// before initializing price tables, but it maybe done in future if
+		// we add support for saving the state between LZMA2 chunks.
+		matchPriceCount = UINT32_MAX / 2;
+		alignPriceCount = UINT32_MAX / 2;
+
+		optsEndIndex = 0;
+		optsCurrentIndex = 0;
+
+		return StatusCode::Ok;
 	}
 }
 
@@ -2790,7 +3255,7 @@ namespace plz
 
 			Sequence sequence {Sequence::Init};
 			/*! LZMA encoder */
-			void *lzma;
+			std::unique_ptr<Lzma1Encoder> lzma; //RBP: Make this unique_ptr - changed from void* to Lzma1Encoder
 
 			/*! LZMA options currently in use. */
 			LzmaOptions optCur;
@@ -2918,7 +3383,8 @@ namespace plz
 		// Get the lowest bits of the uncompressed offset from the LZ layer.
 		uint32_t position = mf->position();
 
-		while (true) {
+		while (true)
+		{
 			// Encode pending bits, if any. Calling this before encoding
 			// the next symbol is needed only with plain LZMA, since
 			// LZMA2 always provides big enough buffer to flush
@@ -2963,39 +3429,40 @@ namespace plz
 			uint32_t back;
 
 			if (coder->fastMode)
-				lzma_lzma_optimum_fast(coder, mf, &back, &len);
+				coder->lzmaOptimumFast(mf, &back, &len);
 			else
-				lzma_lzma_optimum_normal(
-						coder, mf, &back, &len, position);
+				coder->lzmaOptimumNormal(mf, &back, &len, position);
 
-			encode_symbol(coder, mf, back, len, position);
+			coder->encodeSymbol(mf, back, len, position);
 
 			position += len;
 		}
 
-		if (!coder->is_flushed) {
-			coder->is_flushed = true;
+		if (!coder->isFlushed)
+		{
+			coder->isFlushed = true;
 
 			// We don't support encoding plain LZMA streams without EOPM,
 			// and LZMA2 doesn't use EOPM at LZMA level.
 			if (limit == UINT32_MAX)
-				encode_eopm(coder, position);
+				coder->encodeEopm(position);
 
 			// Flush the remaining bytes from the range encoder.
-			rc_flush(&coder->rc);
+			coder->rc.flush();
 
 			// Copy the remaining bytes to the output buffer. If there
 			// isn't enough output space, we will copy out the remaining
 			// bytes on the next call to this function by using
 			// the rc_encode() call in the encoding loop above.
-			if (rc_encode(&coder->rc, out, out_pos, out_size)) {
+			if (coder->rc.encode(out, out_pos, out_size))
+			{
 				assert(limit == UINT32_MAX);
-				return LZMA_OK;
+				return StatusCode::Ok;
 			}
 		}
 
 		// Make it ready for the next LZMA2 chunk.
-		coder->is_flushed = false;
+		coder->isFlushed = false;
 
 		return StatusCode::StreamEnd;
 	}
@@ -3078,11 +3545,11 @@ namespace plz
 		// is small enough). The current code doesn't increment price counts
 		// before initializing price tables, but it maybe done in future if
 		// we add support for saving the state between LZMA2 chunks.
-		coder->match_price_count = UINT32_MAX / 2;
-		coder->align_price_count = UINT32_MAX / 2;
+		coder->matchPriceCount = UINT32_MAX / 2;
+		coder->alignPriceCount = UINT32_MAX / 2;
 
-		coder->opts_end_index = 0;
-		coder->opts_current_index = 0;
+		coder->optsEndIndex = 0;
+		coder->optsCurrentIndex = 0;
 		return StatusCode::Ok;
 	}
 
@@ -3228,8 +3695,7 @@ namespace plz
 					}
 
 					if (coder->needStateReset)
-						return_if_error(lzma_lzma_encoder_reset(
-								coder->lzma, &coder->optCur));
+						return_if_error(coder->lzma->reset(&coder->optCur));
 
 					coder->uncompressedSize = 0;
 					coder->compressedSize = 0;
@@ -3265,7 +3731,7 @@ namespace plz
 					const uint32_t read_start = mf->readPos - mf->readAhead;
 
 					// Call the LZMA encoder until the chunk is finished.
-					const StatusCode ret = lzma_lzma_encode(coder->lzma, mf,
+					const StatusCode ret = LzmaCompressor::lzmaEncode(coder->lzma.get(), mf,
 														  coder->buf + LZMA2_MAX_HEADER_SIZE,
 														  &coder->compressedSize,
 														  LZMA2_MAX_CHUNK_SIZE, limit);
@@ -3296,7 +3762,7 @@ namespace plz
 
 					// The chunk did compress at least by one byte, so we store
 					// the chunk as LZMA.
-					lzma2_header_lzma(coder);
+					validateCoderAndAssignHeader(coder); // lzma2_header_lzma(coder);
 
 					coder->sequence = Lzma2Coder::Sequence::Copy;
 				}

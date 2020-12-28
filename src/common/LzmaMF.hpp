@@ -147,6 +147,9 @@ namespace plz
 
             /*! mf_avail */
             inline uint32_t avail();
+
+            /*! mf_read */
+            inline void read(uint8_t *out, size_t *out_pos, size_t out_size, size_t *left);
     };
 
     uint32_t LzmaMF::unencoded() const
@@ -233,6 +236,21 @@ namespace plz
     uint32_t LzmaMF::avail()
     {
         return writePos - readPos;
+    }
+
+    void LzmaMF::read(uint8_t *out, size_t *out_pos, size_t out_size, size_t *left)
+    {
+        const size_t out_avail = out_size - *out_pos;
+        const size_t copy_size = my_min(out_avail, *left);
+
+        assert(readAhead == 0);
+        assert(readPos >= *left);
+
+        memcpy(out + *out_pos, buffer + readPos - *left,
+               copy_size);
+
+        *out_pos += copy_size;
+        *left -= copy_size;
     }
 }
 

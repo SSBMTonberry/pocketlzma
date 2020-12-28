@@ -175,6 +175,25 @@ namespace plz
         return;
     }
 
+    static inline size_t LzmaBufcpy(const uint8_t * in, size_t * in_pos, size_t in_size,
+                                    uint8_t * out, size_t * out_pos, size_t out_size)
+    {
+        const size_t in_avail = in_size - *in_pos;
+        const size_t out_avail = out_size - *out_pos;
+        const size_t copy_size = my_min(in_avail, out_avail);
+
+        // Call memcpy() only if there is something to copy. If there is
+        // nothing to copy, in or out might be NULL and then the memcpy()
+        // call would trigger undefined behavior.
+        if (copy_size > 0)
+            memcpy(out + *out_pos, in + *in_pos, copy_size);
+
+        *in_pos += copy_size;
+        *out_pos += copy_size;
+
+        return copy_size;
+    }
+
     /*! Find out how many equal bytes the two buffers have.
      *
      * \param      buf1    First buffer

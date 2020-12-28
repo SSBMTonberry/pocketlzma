@@ -186,9 +186,8 @@ namespace plz
                 case Lzma2Coder::Sequence::Copy:
                     // Copy the compressed chunk along its headers to the
                     // output buffer.
-                    lzma_bufcpy(coder->buf, &coder->bufPos,
-                                coder->compressedSize,
-                                out, out_pos, out_size);
+                    LzmaBufcpy(coder->buf, &coder->bufPos, coder->compressedSize, out, out_pos, out_size);
+
                     if (coder->bufPos != coder->compressedSize)
                         return StatusCode::Ok;
 
@@ -197,9 +196,7 @@ namespace plz
 
                 case Lzma2Coder::Sequence::UncompressedHeader:
                     // Copy the three-byte header to indicate uncompressed chunk.
-                    lzma_bufcpy(coder->buf, &coder->bufPos,
-                                LZMA2_HEADER_SIZE_UNCOMPRESSED,
-                                out, out_pos, out_size);
+                    LzmaBufcpy(coder->buf, &coder->bufPos, LZMA2_HEADER_SIZE_UNCOMPRESSED, out, out_pos, out_size);
                     if (coder->bufPos != LZMA2_HEADER_SIZE_UNCOMPRESSED)
                         return StatusCode::Ok;
 
@@ -210,7 +207,7 @@ namespace plz
                 case Lzma2Coder::Sequence::UncompressedCopy:
                     // Copy the uncompressed data as is from the dictionary
                     // to the output buffer.
-                    mf_read(mf, out, out_pos, out_size, &coder->uncompressedSize);
+                    mf->read(out, out_pos, out_size, &coder->uncompressedSize);
                     if (coder->uncompressedSize != 0)
                         return StatusCode::Ok;
 
