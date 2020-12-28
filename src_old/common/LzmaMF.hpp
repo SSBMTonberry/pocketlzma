@@ -155,6 +155,8 @@ namespace plz
 
             /*! lz_encoder_init */
             inline bool init(const LzOptions *lz_options);
+
+            #error implement lz_encoder_prepare!
     };
 
     uint32_t LzmaMF::unencoded() const

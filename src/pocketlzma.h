@@ -5,29 +5,31 @@
 #ifndef POCKETLZMA_POCKETLZMA_H
 #define POCKETLZMA_POCKETLZMA_H
 
-#include "misc/File.hpp"
+namespace plz
+{
+    namespace c
+    {
+        //Only single thread.
+        #define _7ZIP_ST
 
-#include "pocketlzma_common.h"
+        #include "lzma_c/7zTypes.h"
+        #include "lzma_c/Precomp.h"
+        #include "lzma_c/Alloc.h"
+        #include "lzma_c/Alloc.c"
+        #include "lzma_c/LzmaDec.h"
+        #include "lzma_c/LzmaDec.c"
+        #include "lzma_c/LzmaEnc.h"
+        #include "lzma_c/LzmaEnc.c"
 
-#include "common/CommonFunctions.hpp"
-#include "common/Price.hpp"
+        #include "lzma_c/LzFind.c"
+        //#include "lzma_c/Threads.h"
+        //#include "lzma_c/Threads.c"
+        //#include "lzma_c/LzFindMt.c"
 
-#include "common/LzmaMatch.hpp"
-#include "common/LzmaOptions.hpp"
-#include "common/LzOptions.hpp"
-#include "common/LzmaMF.hpp"
-#include "common/LzmaOptimal.hpp"
-#include "common/LengthEncoder.hpp"
-#include "common/RangeEncoder.hpp"
-
-#include "common/Lzma1Encoder.hpp"
-#include "common/Lzma2Coder.hpp"
-
-#include "interfaces/ICompressor.hpp"
-#include "interfaces/IDecompressor.hpp"
-
-#include "compress/LzmaCompressor.hpp"
-#include "compress/Lzma2Compressor.hpp"
+        #include "lzma_c/LzmaLib.h"
+        #include "lzma_c/LzmaLib.c"
+    }
+}
 
 
 #endif //POCKETLZMA_POCKETLZMA_H
