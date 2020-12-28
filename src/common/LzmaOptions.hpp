@@ -23,6 +23,7 @@ namespace plz
      {
          public:
 
+             LzmaOptions &operator=(const LzmaOptions &other);
              /**
              * \brief       Dictionary size in bytes
              *
@@ -77,6 +78,7 @@ namespace plz
              * future, the .xz format will likely get support for preset
              * dictionary though.
              */
+            //RBP: Removed the preset dictionary
             const uint8_t *presetDict;
 
             /**
@@ -221,6 +223,9 @@ namespace plz
 
             /*! Encodes lc/lp/pb into one byte. */
             inline StatusCode lzmaLclppbEncode(uint8_t *byte);
+
+            /*! lzma_lzma_preset - Set default values */
+            inline void initEasy(uint8_t level = 5, bool useExtremePreset = false);
      };
 
     bool LzmaOptions::isLclppbValid() const
@@ -256,6 +261,72 @@ namespace plz
 
         return StatusCode::Ok;
     }
+
+    LzmaOptions &LzmaOptions::operator=(const LzmaOptions &other)
+    {
+        depth = other.depth;
+        dictSize = other.dictSize;
+        lc = other.lc;
+        lp = other.lp;
+        mf = other.mf;
+        mode = other.mode;
+        niceLen = other.niceLen;
+        pb = other.pb;
+        presetDict = other.presetDict;
+        presetDictSize = other.presetDictSize;
+        return *this;
+    }
+
+    void LzmaOptions::initEasy(uint8_t level, bool useExtremePreset)
+    {
+        if(level > 9)
+            level = 9;
+
+        presetDict = NULL;
+        presetDictSize = 0;
+
+        lc = LZMA_LC_DEFAULT;
+        lp = LZMA_LP_DEFAULT;
+        pb = LZMA_PB_DEFAULT;
+
+        static const uint8_t dict_pow2[]
+                = { 18, 20, 21, 22, 22, 23, 23, 24, 25, 26 };
+        dictSize = 1 << dict_pow2[level];
+
+        if (level <= 3)
+        {
+            mode = Mode::Fast;
+            mf = level == 0 ? MatchFinder::HC3: MatchFinder::HC4;
+            niceLen = level <= 1 ? 128 : 273;
+            static const uint8_t depths[] = { 4, 8, 24, 48 };
+            depth = depths[level];
+        }
+        else
+        {
+            mode = Mode::Normal;
+            mf = MatchFinder::BT4;
+            niceLen = level == 4 ? 16 : level == 5 ? 32 : 64;
+            depth = 0;
+        }
+
+        if (useExtremePreset)
+        {
+            mode = Mode::Normal;
+            mf = MatchFinder::BT4;
+            if (level == 3 || level == 5)
+            {
+                niceLen = 192;
+                depth = 0;
+            }
+            else
+            {
+                niceLen = 273;
+                depth = 512;
+            }
+        }
+
+    }
+
 }
 
 #endif //POCKETLZMA_LZMAOPTIONS_HPP

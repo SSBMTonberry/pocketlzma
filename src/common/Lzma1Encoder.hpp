@@ -1334,8 +1334,7 @@ namespace plz
         // a non-empty preset dictionary. encode_init() wouldn't even work
         // if there is a non-empty preset dictionary, because encode_init()
         // assumes that position is zero and previous byte is also zero.
-        isInitialized = options->presetDict != NULL
-                                && options->presetDictSize > 0;
+        isInitialized = options->presetDict != nullptr && options->presetDictSize > 0;
         isFlushed = false;
 
         lz_options->setOptions(*options);

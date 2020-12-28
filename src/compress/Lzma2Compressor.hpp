@@ -36,16 +36,22 @@ namespace plz
         output = input;
         size_t pos {0};
 
+        LzmaOptions options;
+        options.initEasy(5, false);
+
+        LzOptions lzOptions;
+
         LzmaMF mf;
-        mf.buffer = &output[0];
-        mf.size = output.size();
+        //mf.writePos = output.size();
+        //mf.buffer = &output[0];
+        //mf.size = output.size();
 
         Lzma2Coder coder;
         coder.uncompressedSize = input.size();
-        coder.lzma = std::unique_ptr<Lzma1Encoder>(new plz::Lzma1Encoder());
-        coder.lzma->init(&mf);
-
-        return encode(&coder, &mf, &output[0], &pos, output.size());
+        coder.init(options, lzOptions, &mf);
+        
+        StatusCode status = encode(&coder, &mf, &output[0], &pos, output.size());
+        return status;
     }
 
     StatusCode Lzma2Compressor::validateCoderAndAssignHeader(Lzma2Coder *coder)
