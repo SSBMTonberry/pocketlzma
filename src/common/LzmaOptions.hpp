@@ -217,6 +217,9 @@ namespace plz
 
             /*! is_options_valid */
             inline bool isValid() const;
+
+            /*! Encodes lc/lp/pb into one byte. */
+            inline StatusCode lzmaLclppbEncode(uint8_t *byte);
      };
 
     bool LzmaOptions::isLclppbValid() const
@@ -238,6 +241,19 @@ namespace plz
                && niceLen >= MATCH_LEN_MIN
                && niceLen <= MATCH_LEN_MAX
                && (mode == Mode::Fast || mode == Mode::Normal);
+    }
+
+    StatusCode LzmaOptions::lzmaLclppbEncode(uint8_t *byte)
+    {
+        StatusCode lclppbStatus = isLclppbValid() ? StatusCode::Ok : StatusCode::ErrorInLclppbCheckOnLzmaOptions;
+        if (lclppbStatus != StatusCode::Ok)
+            return lclppbStatus;
+
+        *byte = (pb * 5 + lp) * 9 + lc;
+        if(*byte > (4 * 5 + 4) * 9 + 8)
+            return StatusCode::InvalidLclppbByteValue;
+
+        return StatusCode::Ok;
     }
 }
 

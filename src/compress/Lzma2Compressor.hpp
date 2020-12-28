@@ -74,7 +74,7 @@ namespace plz
         // Properties, if needed
         if (coder->needProperties)
         {
-            StatusCode status = lzmaLclppbEncode(&coder->optCur, coder->buf + pos);
+            StatusCode status = coder->optCur.lzmaLclppbEncode(coder->buf + pos);
             if(status != StatusCode::Ok)
                 return status;
         }
