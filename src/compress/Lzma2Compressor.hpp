@@ -221,8 +221,13 @@ namespace plz
 
     StatusCode Lzma2Compressor::compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output)
     {
+        Lzma2Coder coder;
+        LzmaMF mf;
+        size_t pos {0};
 
-        return StatusCode::UndefinedError;
+        output = input;
+
+        return encode(&coder, &mf, &output[0], &pos, output.size());
     }
 
     StatusCode Lzma2Compressor::headerUncompressed(Lzma2Coder *coder)

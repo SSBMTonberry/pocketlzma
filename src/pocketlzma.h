@@ -5,6 +5,8 @@
 #ifndef POCKETLZMA_POCKETLZMA_H
 #define POCKETLZMA_POCKETLZMA_H
 
+#include "misc/File.hpp"
+
 #include "pocketlzma_common.h"
 
 #include "common/CommonFunctions.hpp"

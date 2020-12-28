@@ -27,3 +27,16 @@ TEST_CASE( "Basic test", "[basic]" )
 
     REQUIRE(status == plz::StatusCode::Ok);
 }
+
+TEST_CASE( "Compress json - expect smaller compressed size", "[compression]" )
+{
+    std::string path = "./../../content/to_compress/from/json_test.json";
+    std::vector<uint8_t> input = plz::File::FromFile(path);
+
+    std::unique_ptr<plz::ICompressor> compressor {new plz::Lzma2Compressor()}; //The nasty C++11 way
+    std::vector<uint8_t> output;
+    plz::StatusCode status = compressor->compress(input, output);
+
+    REQUIRE(status == plz::StatusCode::Ok);
+    REQUIRE(output.size() < input.size());
+}
