@@ -13,9 +13,9 @@
 #include "common/Price.hpp"
 
 #include "common/LzmaMatch.hpp"
-#include "common/LzmaMF.hpp"
 #include "common/LzmaOptions.hpp"
 #include "common/LzOptions.hpp"
+#include "common/LzmaMF.hpp"
 #include "common/LzmaOptimal.hpp"
 #include "common/LengthEncoder.hpp"
 #include "common/RangeEncoder.hpp"

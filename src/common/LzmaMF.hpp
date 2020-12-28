@@ -5,6 +5,8 @@
 #ifndef POCKETLZMA_LZMAMF_HPP
 #define POCKETLZMA_LZMAMF_HPP
 
+#include "LzOptions.hpp"
+
 namespace plz
 {
     class LzmaMF
@@ -81,8 +83,8 @@ namespace plz
             /// This is called only via mf_skip().
             void (*skip)(LzmaMF *mf, uint32_t num);
 
-            uint32_t *hash;
-            uint32_t *son;
+            std::unique_ptr<uint32_t> hash;
+            std::unique_ptr<uint32_t> son;
             uint32_t cyclic_pos;
             uint32_t cyclic_size; // Must be dictionary size + 1.
             uint32_t hash_mask;
@@ -150,6 +152,9 @@ namespace plz
 
             /*! mf_read */
             inline void read(uint8_t *out, size_t *out_pos, size_t out_size, size_t *left);
+
+            /*! lz_encoder_init */
+            inline bool init(const LzOptions *lz_options);
     };
 
     uint32_t LzmaMF::unencoded() const
@@ -251,6 +256,88 @@ namespace plz
 
         *out_pos += copy_size;
         *left -= copy_size;
+    }
+
+    bool LzmaMF::init(const LzOptions *lz_options)
+    {
+        // Allocate the history buffer.
+        // RBP: Might need to uncomment and do something here
+        //if (buffer == nullptr) {
+        //    // lzma_memcmplen() is used for the dictionary buffer
+        //    // so we need to allocate a few extra bytes to prevent
+        //    // it from reading past the end of the buffer.
+        //    buffer = lzma_alloc(size + LZMA_MEMCMPLEN_EXTRA,
+        //                            allocator);
+        //    if (buffer == NULL)
+        //        return true;
+        //    // Keep Valgrind happy with lzma_memcmplen() and initialize
+        //    // the extra bytes whose value may get read but which will
+        //    // effectively get ignored.
+        //    memzero(buffer + size, LZMA_MEMCMPLEN_EXTRA);
+        //}
+
+        // Use cyclic_size as initial offset. This allows
+        // avoiding a few branches in the match finders. The downside is
+        // that match finder needs to be normalized more often, which may
+        // hurt performance with huge dictionaries.
+        offset = cyclic_size;
+        readPos = 0;
+        readAhead = 0;
+        readLimit = 0;
+        writePos = 0;
+        pending = 0;
+
+        #if UINT32_MAX >= SIZE_MAX / 4
+                // Check for integer overflow. (Huge dictionaries are not
+            // possible on 32-bit CPU.)
+            if (hash_count > SIZE_MAX / sizeof(uint32_t)
+                    || sons_count > SIZE_MAX / sizeof(uint32_t))
+                return true;
+        #endif
+
+        // Allocate and initialize the hash table. Since EMPTY_HASH_VALUE
+        // is zero, we can use lzma_alloc_zero() or memzero() for hash.
+        //
+        // We don't need to initialize son, but not doing that may
+        // make Valgrind complain in normalization (see normalize() in
+        // lz_encoder_mf.c). Skipping the initialization is *very* good
+        // when big dictionary is used but only small amount of data gets
+        // actually compressed: most of the son won't get actually
+        // allocated by the kernel, so we avoid wasting RAM and improve
+        // initialization speed a lot.
+        if (hash == nullptr)
+        {
+            hash = std::unique_ptr<uint32_t>(new uint32_t (hashCount * sizeof(uint32_t)));
+            son = std::unique_ptr<uint32_t>(new uint32_t (sonsCount * sizeof(uint32_t)));
+        }
+        else
+        {
+/*
+		for (uint32_t i = 0; i < hash_count; ++i)
+			hash[i] = EMPTY_HASH_VALUE;
+*/
+            //memzero(hash, hashCount * sizeof(uint32_t));
+            memset(hash.get(), 0, hashCount * sizeof(uint32_t));
+        }
+
+        cyclic_pos = 0;
+
+        // Handle preset dictionary.
+        if (lz_options->presetDict != nullptr
+            && lz_options->presetDictSize > 0) {
+            // If the preset dictionary is bigger than the actual
+            // dictionary, use only the tail.
+            writePos = my_min(lz_options->presetDictSize, size);
+            memcpy(buffer, lz_options->presetDict
+                               + lz_options->presetDictSize - writePos,
+                   writePos);
+            action = LzmaAction::SyncFlush;
+            mfSkip(writePos);
+        }
+
+        action = LzmaAction::Run;
+
+        return false;
     }
 }
 

@@ -40,17 +40,21 @@ namespace plz
         options.initEasy(5, false);
 
         LzOptions lzOptions;
+        lzOptions.setOptions(options);
 
         LzmaMF mf;
-        //mf.writePos = output.size();
-        //mf.buffer = &output[0];
-        //mf.size = output.size();
+        mf.buffer = &output[0];
+        mf.size = output.size();
+        mf.init(&lzOptions);
 
         Lzma2Coder coder;
         coder.uncompressedSize = input.size();
-        coder.init(options, lzOptions, &mf);
-        
-        StatusCode status = encode(&coder, &mf, &output[0], &pos, output.size());
+
+        StatusCode status = coder.init(options, lzOptions, &mf);
+        if(status != StatusCode::Ok)
+            return status;
+
+        status = encode(&coder, &mf, &output[0], &pos, output.size());
         return status;
     }
 
