@@ -31,6 +31,22 @@ namespace plz
             uint32_t m_chunkSize {LZMA2_MAX_CHUNK_SIZE};
     };
 
+    StatusCode Lzma2Compressor::compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output)
+    {
+        output = input;
+        size_t pos {0};
+
+        LzmaMF mf;
+        mf.buffer = &output[0];
+        mf.size = output.size();
+
+        Lzma2Coder coder;
+        coder.uncompressedSize = input.size();
+        coder.lzma = std::unique_ptr<Lzma1Encoder>(new plz::Lzma1Encoder());
+        coder.lzma->init(&mf);
+
+        return encode(&coder, &mf, &output[0], &pos, output.size());
+    }
 
     StatusCode Lzma2Compressor::validateCoderAndAssignHeader(Lzma2Coder *coder)
     {
@@ -217,17 +233,6 @@ namespace plz
         }
 
         return StatusCode::Ok;
-    }
-
-    StatusCode Lzma2Compressor::compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output)
-    {
-        Lzma2Coder coder;
-        LzmaMF mf;
-        size_t pos {0};
-
-        output = input;
-
-        return encode(&coder, &mf, &output[0], &pos, output.size());
     }
 
     StatusCode Lzma2Compressor::headerUncompressed(Lzma2Coder *coder)

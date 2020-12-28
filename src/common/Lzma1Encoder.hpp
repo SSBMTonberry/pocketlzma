@@ -94,6 +94,9 @@ namespace plz
             /*! lzma_lzma_optimum_fast */
             inline void lzmaOptimumFast(LzmaMF *mf, uint32_t *back_res, uint32_t *len_res);
 
+            /*! lzma_lzma_encoder_create */
+            inline StatusCode create(const LzmaOptions *options, LzOptions *lz_options);
+
         private:
             /*! fill_dist_prices */
             inline void fillDistPrices();
@@ -1290,6 +1293,54 @@ namespace plz
         optsCurrentIndex = 0;
 
         return StatusCode::Ok;
+    }
+
+    StatusCode Lzma1Encoder::create(const LzmaOptions *options, LzOptions *lz_options)
+    {
+
+
+        // Set compression mode. We haven't validates the options yet,
+        // but it's OK here, since nothing bad happens with invalid
+        // options in the code below, and they will get rejected by
+        // lzma_lzma_encoder_reset() call at the end of this function.
+        switch (options->mode) {
+            case Mode::Fast:
+                fastMode = true;
+                break;
+
+            case Mode::Normal:
+            {
+                fastMode = false;
+
+                // Set dist_table_size.
+                // Round the dictionary size up to next 2^n.
+                uint32_t log_size = 0;
+                while ((1 << log_size) < options->dictSize)
+                    ++log_size;
+
+                distTableSize = log_size * 2;
+
+                // Length encoders' price table size
+                matchLenEncoder.tableSize = options->niceLen + 1 - MATCH_LEN_MIN;
+                repLenEncoder.tableSize = options->niceLen + 1 - MATCH_LEN_MIN;
+                break;
+            }
+
+            default:
+                return StatusCode::OptionsError;
+        }
+
+        // We don't need to write the first byte as literal if there is
+        // a non-empty preset dictionary. encode_init() wouldn't even work
+        // if there is a non-empty preset dictionary, because encode_init()
+        // assumes that position is zero and previous byte is also zero.
+        isInitialized = options->presetDict != NULL
+                                && options->presetDictSize > 0;
+        isFlushed = false;
+
+        lz_options->setOptions(*options);
+
+        return reset(options);
     }
 }
 

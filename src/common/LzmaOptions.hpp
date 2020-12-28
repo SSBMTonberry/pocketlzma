@@ -22,6 +22,7 @@ namespace plz
      class LzmaOptions
      {
          public:
+
              /**
              * \brief       Dictionary size in bytes
              *
