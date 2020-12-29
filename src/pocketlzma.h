@@ -51,6 +51,7 @@ namespace plz
 }
 #include "pocketlzma_common.hpp"
 #include "Settings.hpp"
+#include "misc/FileStatus.hpp"
 #include "misc/File.hpp"
 #include "misc/MemoryBuffer.hpp"
 #include "misc/MemoryStream.hpp"

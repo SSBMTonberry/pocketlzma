@@ -472,7 +472,7 @@ typedef struct
   size_t offset;         /* (offset == (k * sizeof(void *)) && offset < (1 << numAlignBits) */
 } CAlignOffsetAlloc;
 
-void AlignOffsetAlloc_CreateVTable(CAlignOffsetAlloc *p);
+inline void AlignOffsetAlloc_CreateVTable(CAlignOffsetAlloc *p);
 
 EXTERN_C_END
 
@@ -708,16 +708,16 @@ void BigFree(void *address)
 
 #endif
 
-static void *SzAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return MyAlloc(size); }
-static void SzFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); MyFree(address); }
+inline static void *SzAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return MyAlloc(size); }
+inline static void SzFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); MyFree(address); }
 const ISzAlloc g_Alloc = { SzAlloc, SzFree };
 
-static void *SzMidAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return MidAlloc(size); }
-static void SzMidFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); MidFree(address); }
+inline static void *SzMidAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return MidAlloc(size); }
+inline static void SzMidFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); MidFree(address); }
 const ISzAlloc g_MidAlloc = { SzMidAlloc, SzMidFree };
 
-static void *SzBigAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return BigAlloc(size); }
-static void SzBigFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); BigFree(address); }
+inline static void *SzBigAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return BigAlloc(size); }
+inline static void SzBigFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); BigFree(address); }
 const ISzAlloc g_BigAlloc = { SzBigAlloc, SzBigFree };
 
 /*
@@ -854,7 +854,7 @@ const ISzAlloc g_AlignedAlloc = { SzAlignedAlloc, SzAlignedFree };
 #define REAL_BLOCK_PTR_VAR(p) ((void **)(p))[-1]
 */
 
-static void *AlignOffsetAlloc_Alloc(ISzAllocPtr pp, size_t size)
+inline static void *AlignOffsetAlloc_Alloc(ISzAllocPtr pp, size_t size)
 {
   CAlignOffsetAlloc *p = CONTAINER_FROM_VTBL(pp, CAlignOffsetAlloc, vt);
   void *adr;
@@ -897,7 +897,7 @@ static void *AlignOffsetAlloc_Alloc(ISzAllocPtr pp, size_t size)
   return pAligned;
 }
 
-static void AlignOffsetAlloc_Free(ISzAllocPtr pp, void *address)
+inline static void AlignOffsetAlloc_Free(ISzAllocPtr pp, void *address)
 {
   if (address)
   {
@@ -955,7 +955,7 @@ Returns:
   SZ_ERROR_UNSUPPORTED - Unsupported properties
 */
 
-SRes LzmaProps_Decode(CLzmaProps *p, const Byte *data, unsigned size);
+inline SRes LzmaProps_Decode(CLzmaProps *p, const Byte *data, unsigned size);
 
 /* ---------- LZMA Decoder state ---------- */
 
@@ -989,7 +989,7 @@ typedef struct
 
 #define LzmaDec_Construct(p) { (p)->dic = NULL; (p)->probs = NULL; }
 
-void LzmaDec_Init(CLzmaDec *p);
+inline void LzmaDec_Init(CLzmaDec *p);
 
 /* There are two types of LZMA streams:
 	 - Stream with end mark. That end mark adds about 6 bytes to compressed size.
@@ -1048,11 +1048,11 @@ LzmaDec_Allocate* can return:
   SZ_ERROR_UNSUPPORTED - Unsupported properties
 */
 
-SRes LzmaDec_AllocateProbs(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
-void LzmaDec_FreeProbs(CLzmaDec *p, ISzAllocPtr alloc);
+inline SRes LzmaDec_AllocateProbs(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
+inline void LzmaDec_FreeProbs(CLzmaDec *p, ISzAllocPtr alloc);
 
-SRes LzmaDec_Allocate(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
-void LzmaDec_Free(CLzmaDec *p, ISzAllocPtr alloc);
+inline SRes LzmaDec_Allocate(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
+inline void LzmaDec_Free(CLzmaDec *p, ISzAllocPtr alloc);
 
 /* ---------- Dictionary Interface ---------- */
 
@@ -1095,7 +1095,7 @@ Returns:
   SZ_ERROR_DATA - Data error
 */
 
-SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit,
+inline SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit,
 	const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status);
 
 /* ---------- Buffer Interface ---------- */
@@ -1111,7 +1111,7 @@ finishMode:
   LZMA_FINISH_END - Stream must be finished after (*destLen).
 */
 
-SRes LzmaDec_DecodeToBuf(CLzmaDec *p, Byte *dest, SizeT *destLen,
+inline SRes LzmaDec_DecodeToBuf(CLzmaDec *p, Byte *dest, SizeT *destLen,
 	const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status);
 
 /* ---------- One Call Interface ---------- */
@@ -1135,7 +1135,7 @@ Returns:
   SZ_ERROR_INPUT_EOF - It needs more bytes in input buffer (src).
 */
 
-SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
+inline SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
 	const Byte *propData, unsigned propSize, ELzmaFinishMode finishMode,
 	ELzmaStatus *status, ISzAllocPtr alloc);
 
@@ -2348,9 +2348,9 @@ typedef struct _CLzmaEncProps
 						Encoder uses this value to reduce dictionary size */
 } CLzmaEncProps;
 
-void LzmaEncProps_Init(CLzmaEncProps *p);
-void LzmaEncProps_Normalize(CLzmaEncProps *p);
-UInt32 LzmaEncProps_GetDictSize(const CLzmaEncProps *props2);
+inline void LzmaEncProps_Init(CLzmaEncProps *p);
+inline void LzmaEncProps_Normalize(CLzmaEncProps *p);
+inline UInt32 LzmaEncProps_GetDictSize(const CLzmaEncProps *props2);
 
 /* ---------- CLzmaEncHandle Interface ---------- */
 
@@ -2367,22 +2367,22 @@ SRes:
 
 typedef void * CLzmaEncHandle;
 
-CLzmaEncHandle LzmaEnc_Create(ISzAllocPtr alloc);
-void LzmaEnc_Destroy(CLzmaEncHandle p, ISzAllocPtr alloc, ISzAllocPtr allocBig);
+inline CLzmaEncHandle LzmaEnc_Create(ISzAllocPtr alloc);
+inline void LzmaEnc_Destroy(CLzmaEncHandle p, ISzAllocPtr alloc, ISzAllocPtr allocBig);
 
-SRes LzmaEnc_SetProps(CLzmaEncHandle p, const CLzmaEncProps *props);
-void LzmaEnc_SetDataSize(CLzmaEncHandle p, UInt64 expectedDataSiize);
-SRes LzmaEnc_WriteProperties(CLzmaEncHandle p, Byte *properties, SizeT *size);
-unsigned LzmaEnc_IsWriteEndMark(CLzmaEncHandle p);
+inline SRes LzmaEnc_SetProps(CLzmaEncHandle p, const CLzmaEncProps *props);
+inline void LzmaEnc_SetDataSize(CLzmaEncHandle p, UInt64 expectedDataSiize);
+inline SRes LzmaEnc_WriteProperties(CLzmaEncHandle p, Byte *properties, SizeT *size);
+inline unsigned LzmaEnc_IsWriteEndMark(CLzmaEncHandle p);
 
-SRes LzmaEnc_Encode(CLzmaEncHandle p, ISeqOutStream *outStream, ISeqInStream *inStream,
+inline SRes LzmaEnc_Encode(CLzmaEncHandle p, ISeqOutStream *outStream, ISeqInStream *inStream,
 	ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
-SRes LzmaEnc_MemEncode(CLzmaEncHandle p, Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
+inline SRes LzmaEnc_MemEncode(CLzmaEncHandle p, Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
 	int writeEndMark, ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
 
 /* ---------- One Call Interface ---------- */
 
-SRes LzmaEncode(Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
+inline SRes LzmaEncode(Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
 	const CLzmaEncProps *props, Byte *propsEncoded, SizeT *propsSize, int writeEndMark,
 	ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
 
@@ -6856,6 +6856,92 @@ namespace plz
 /*** End of inlined file: Settings.hpp ***/
 
 
+/*** Start of inlined file: FileStatus.hpp ***/
+//
+// Created by robin on 29.12.2020.
+//
+
+#ifndef POCKETLZMA_FILESTATUS_HPP
+#define POCKETLZMA_FILESTATUS_HPP
+
+namespace plz
+{
+	class FileStatus
+	{
+		public:
+
+			enum class Code
+			{
+				Ok = 0,
+				FileWriteError = 100,
+				FileReadError = 200
+			};
+
+			FileStatus() = default;
+			FileStatus(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message);
+
+			inline void set(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message);
+
+			inline Code status() const;
+			inline int code() const;
+			inline const std::string &exception() const;
+			inline const std::string &category() const;
+			inline const std::string &message() const;
+
+		private:
+			Code m_status { Code::Ok };
+			int m_code {0};
+			std::string m_exception;
+			std::string m_category;
+			std::string m_message;
+
+	};
+
+	FileStatus::FileStatus(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message)
+	{
+		set(status, code, exception, category, message);
+	}
+
+	void FileStatus::set(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message)
+	{
+		m_status = status;
+		m_code = code;
+		m_exception = exception;
+		m_category = category;
+		m_message = message;
+	}
+
+	FileStatus::Code FileStatus::status() const
+	{
+		return m_status;
+	}
+
+	int FileStatus::code() const
+	{
+		return m_code;
+	}
+
+	const std::string &FileStatus::exception() const
+	{
+		return m_exception;
+	}
+
+	const std::string &FileStatus::category() const
+	{
+		return m_category;
+	}
+
+	const std::string &FileStatus::message() const
+	{
+		return m_message;
+	}
+}
+
+#endif //POCKETLZMA_FILESTATUS_HPP
+
+/*** End of inlined file: FileStatus.hpp ***/
+
+
 /*** Start of inlined file: File.hpp ***/
 //
 // Created by robin on 28.12.2020.
@@ -6922,6 +7008,7 @@ namespace plz
 
 /*** End of inlined file: MemoryStream.hpp ***/
 
+#include <fstream>
 namespace plz
 {
 	class File
@@ -6932,9 +7019,9 @@ namespace plz
 			static inline void FromMemory(const void *data, size_t size, std::vector<uint8_t> &output);
 
 			static inline std::vector<uint8_t> FromFile(const std::string &path);
-			static inline void FromFile(const std::string &path, std::vector<uint8_t> &output);
+			static inline FileStatus FromFile(const std::string &path, std::vector<uint8_t> &output);
 
-			static inline void ToFile(const std::string &path, const std::vector<uint8_t> &data);
+			static inline FileStatus ToFile(const std::string &path, const std::vector<uint8_t> &data);
 	};
 
 	std::vector<uint8_t> File::FromMemory(const void *data, size_t size)
@@ -6968,31 +7055,49 @@ namespace plz
 		return bytes;
 	}
 
-	void File::FromFile(const std::string &path, std::vector<uint8_t> &output)
+	FileStatus File::FromFile(const std::string &path, std::vector<uint8_t> &output)
 	{
 		std::fstream file;
 		file = std::fstream(path, std::ios::in | std::ios::binary);
+		file.exceptions(std::fstream::failbit | std::fstream::badbit);
 
-		//Find size
-		file.seekg(0, std::ios::end);
-		size_t fileSize = file.tellg();
-		file.seekg(0, std::ios::beg);
+		try
+		{
+			//Find size
+			file.seekg(0, std::ios::end);
+			size_t fileSize = file.tellg();
+			file.seekg(0, std::ios::beg);
 
-		output.resize(fileSize);
+			output.resize(fileSize);
 
-		file.read((char *)&output[0], fileSize);
-		file.close();
+			file.read((char *) &output[0], fileSize);
+			file.close();
+		}
+		catch (std::fstream::failure e)
+		{
+			return FileStatus(FileStatus::Code::FileReadError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
+		}
 	}
 
-	void File::ToFile(const std::string &path, const std::vector<uint8_t> &data)
+	FileStatus File::ToFile(const std::string &path, const std::vector<uint8_t> &data)
 	{
 		std::fstream file;
-		file = std::fstream(path, std::ios::out | std::ios::binary);
+		file.exceptions(std::fstream::failbit | std::fstream::badbit);
 
-		for(const auto &b : data) //b = byte
-			file << b;
+		try
+		{
+			file = std::fstream(path, std::ios::out | std::ios::binary);
 
-		file.close();
+			for (const auto &b : data) //b = byte
+				file << b;
+
+			file.close();
+			return FileStatus();
+		}
+		catch (std::fstream::failure e)
+		{
+			return FileStatus(FileStatus::Code::FileWriteError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
+		}
 	}
 }
 
@@ -7015,12 +7120,21 @@ namespace plz
 	{
 		public:
 			PocketLzma() = default;
-
+			explicit PocketLzma(const Settings &settings) : m_settings {settings} {};
+			inline void setSettings(const Settings &settings);
 			inline StatusCode compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output);
 
 		private:
 			Settings m_settings {};
 	};
+	/*!
+	 * This is optional. PocketLzma uses default values if not set by the user.
+	 * @param settings new settings
+	 */
+	void PocketLzma::setSettings(const Settings &settings)
+	{
+		m_settings = settings;
+	}
 
 	StatusCode PocketLzma::compress(const std::vector <uint8_t> &input, std::vector <uint8_t> &output)
 	{
@@ -7041,6 +7155,7 @@ namespace plz
 
 		return status;
 	}
+
 }
 
 #endif //POCKETLZMA_POCKETLZMA_CLASS_HPP

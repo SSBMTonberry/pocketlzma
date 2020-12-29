@@ -11,12 +11,21 @@ namespace plz
     {
         public:
             PocketLzma() = default;
-
+            explicit PocketLzma(const Settings &settings) : m_settings {settings} {};
+            inline void setSettings(const Settings &settings);
             inline StatusCode compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output);
 
         private:
             Settings m_settings {};
     };
+    /*!
+     * This is optional. PocketLzma uses default values if not set by the user.
+     * @param settings new settings
+     */
+    void PocketLzma::setSettings(const Settings &settings)
+    {
+        m_settings = settings;
+    }
 
     StatusCode PocketLzma::compress(const std::vector <uint8_t> &input, std::vector <uint8_t> &output)
     {
@@ -37,6 +46,7 @@ namespace plz
 
         return status;
     }
+
 }
 
 #endif //POCKETLZMA_POCKETLZMA_CLASS_HPP

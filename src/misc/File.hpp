@@ -6,6 +6,7 @@
 #define POCKETLZMA_FILE_HPP
 
 #include "MemoryStream.hpp"
+#include <fstream>
 namespace plz
 {
     class File
@@ -16,9 +17,9 @@ namespace plz
             static inline void FromMemory(const void *data, size_t size, std::vector<uint8_t> &output);
 
             static inline std::vector<uint8_t> FromFile(const std::string &path);
-            static inline void FromFile(const std::string &path, std::vector<uint8_t> &output);
+            static inline FileStatus FromFile(const std::string &path, std::vector<uint8_t> &output);
 
-            static inline void ToFile(const std::string &path, const std::vector<uint8_t> &data);
+            static inline FileStatus ToFile(const std::string &path, const std::vector<uint8_t> &data);
     };
 
     std::vector<uint8_t> File::FromMemory(const void *data, size_t size)
@@ -52,31 +53,49 @@ namespace plz
         return bytes;
     }
 
-    void File::FromFile(const std::string &path, std::vector<uint8_t> &output)
+    FileStatus File::FromFile(const std::string &path, std::vector<uint8_t> &output)
     {
         std::fstream file;
         file = std::fstream(path, std::ios::in | std::ios::binary);
+        file.exceptions(std::fstream::failbit | std::fstream::badbit);
 
-        //Find size
-        file.seekg(0, std::ios::end);
-        size_t fileSize = file.tellg();
-        file.seekg(0, std::ios::beg);
+        try
+        {
+            //Find size
+            file.seekg(0, std::ios::end);
+            size_t fileSize = file.tellg();
+            file.seekg(0, std::ios::beg);
 
-        output.resize(fileSize);
+            output.resize(fileSize);
 
-        file.read((char *)&output[0], fileSize);
-        file.close();
+            file.read((char *) &output[0], fileSize);
+            file.close();
+        }
+        catch (std::fstream::failure e)
+        {
+            return FileStatus(FileStatus::Code::FileReadError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
+        }
     }
 
-    void File::ToFile(const std::string &path, const std::vector<uint8_t> &data)
+    FileStatus File::ToFile(const std::string &path, const std::vector<uint8_t> &data)
     {
         std::fstream file;
-        file = std::fstream(path, std::ios::out | std::ios::binary);
+        file.exceptions(std::fstream::failbit | std::fstream::badbit);
 
-        for(const auto &b : data) //b = byte
-            file << b;
+        try
+        {
+            file = std::fstream(path, std::ios::out | std::ios::binary);
 
-        file.close();
+            for (const auto &b : data) //b = byte
+                file << b;
+
+            file.close();
+            return FileStatus();
+        }
+        catch (std::fstream::failure e)
+        {
+            return FileStatus(FileStatus::Code::FileWriteError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
+        }
     }
 }
 
