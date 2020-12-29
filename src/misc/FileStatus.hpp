@@ -15,11 +15,16 @@ namespace plz
             {
                 Ok = 0,
                 FileWriteError = 100,
-                FileReadError = 200
+                FileWriteErrorBadBit = 101,
+                FileWriteErrorFailBit = 102,
+
+                FileReadError = 200,
+                FileReadErrorBadBit = 201,
+                FileReadErrorFailBit = 202
             };
 
-            FileStatus() = default;
-            FileStatus(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message);
+            inline FileStatus() = default;
+            inline FileStatus(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message);
 
             inline void set(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message);
 

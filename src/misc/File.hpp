@@ -56,11 +56,24 @@ namespace plz
     FileStatus File::FromFile(const std::string &path, std::vector<uint8_t> &output)
     {
         std::fstream file;
-        file = std::fstream(path, std::ios::in | std::ios::binary);
-        file.exceptions(std::fstream::failbit | std::fstream::badbit);
-
         try
         {
+            file = std::fstream(path, std::ios::in | std::ios::binary);
+            file.exceptions(std::fstream::failbit | std::fstream::badbit);
+            bool isBad = file.bad();
+            bool isFail = file.fail();
+            bool isOpen = file.is_open();
+
+            if(isBad || isFail || !isOpen)
+                file.close();
+
+            if(isBad)
+                return FileStatus(FileStatus::Code::FileWriteErrorBadBit, 0, "", "", "");
+            else if(isFail)
+                return FileStatus(FileStatus::Code::FileWriteErrorFailBit, 0, "", "", "");
+            else if(!isOpen)
+                return FileStatus(FileStatus::Code::FileWriteError, 0, "", "", "");
+
             //Find size
             file.seekg(0, std::ios::end);
             size_t fileSize = file.tellg();
@@ -71,7 +84,7 @@ namespace plz
             file.read((char *) &output[0], fileSize);
             file.close();
         }
-        catch (std::fstream::failure e)
+        catch (const std::fstream::failure &e)
         {
             return FileStatus(FileStatus::Code::FileReadError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
         }
@@ -85,6 +98,19 @@ namespace plz
         try
         {
             file = std::fstream(path, std::ios::out | std::ios::binary);
+            bool isBad = file.bad();
+            bool isFail = file.fail();
+            bool isOpen = file.is_open();
+
+            if(isBad || isFail || !isOpen)
+                file.close();
+
+            if(isBad)
+                return FileStatus(FileStatus::Code::FileWriteErrorBadBit, 0, "", "", "");
+            else if(isFail)
+                return FileStatus(FileStatus::Code::FileWriteErrorFailBit, 0, "", "", "");
+            else if(!isOpen)
+                return FileStatus(FileStatus::Code::FileWriteError, 0, "", "", "");
 
             for (const auto &b : data) //b = byte
                 file << b;
@@ -92,7 +118,7 @@ namespace plz
             file.close();
             return FileStatus();
         }
-        catch (std::fstream::failure e)
+        catch (const std::fstream::failure &e)
         {
             return FileStatus(FileStatus::Code::FileWriteError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
         }

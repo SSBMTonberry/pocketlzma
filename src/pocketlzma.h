@@ -37,16 +37,19 @@ namespace plz
         #include "lzma_c/7zTypes.h"
         #include "lzma_c/Precomp.h"
         #include "lzma_c/Alloc.h"
-        #include "lzma_c/Alloc.c"
         #include "lzma_c/LzmaDec.h"
-        #include "lzma_c/LzmaDec.c"
         #include "lzma_c/LzmaEnc.h"
-        #include "lzma_c/LzmaEnc.c"
-
-        #include "lzma_c/LzFind.c"
 
         #include "lzma_c/LzmaLib.h"
-        #include "lzma_c/LzmaLib.c"
+
+        #ifndef POCKETLZMA_LZMA_C_DEFINED
+        #define POCKETLZMA_LZMA_C_DEFINED
+            #include "lzma_c/Alloc.c"
+            #include "lzma_c/LzmaDec.c"
+            #include "lzma_c/LzmaEnc.c"
+            #include "lzma_c/LzFind.c"
+            #include "lzma_c/LzmaLib.c"
+        #endif //POCKETLZMA_LZMA_C_DEFINED
     }
 }
 #include "pocketlzma_common.hpp"

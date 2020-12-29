@@ -472,7 +472,7 @@ typedef struct
   size_t offset;         /* (offset == (k * sizeof(void *)) && offset < (1 << numAlignBits) */
 } CAlignOffsetAlloc;
 
-inline void AlignOffsetAlloc_CreateVTable(CAlignOffsetAlloc *p);
+void AlignOffsetAlloc_CreateVTable(CAlignOffsetAlloc *p);
 
 EXTERN_C_END
 
@@ -480,6 +480,441 @@ EXTERN_C_END
 
 /*** End of inlined file: Alloc.h ***/
 
+
+/*** Start of inlined file: LzmaDec.h ***/
+#ifndef __LZMA_DEC_H
+#define __LZMA_DEC_H
+
+EXTERN_C_BEGIN
+
+/* #define _LZMA_PROB32 */
+/* _LZMA_PROB32 can increase the speed on some CPUs,
+   but memory usage for CLzmaDec::probs will be doubled in that case */
+
+typedef
+#ifdef _LZMA_PROB32
+  UInt32
+#else
+  UInt16
+#endif
+  CLzmaProb;
+
+/* ---------- LZMA Properties ---------- */
+
+#define LZMA_PROPS_SIZE 5
+
+typedef struct _CLzmaProps
+{
+  Byte lc;
+  Byte lp;
+  Byte pb;
+  Byte _pad_;
+  UInt32 dicSize;
+} CLzmaProps;
+
+/* LzmaProps_Decode - decodes properties
+Returns:
+  SZ_OK
+  SZ_ERROR_UNSUPPORTED - Unsupported properties
+*/
+
+SRes LzmaProps_Decode(CLzmaProps *p, const Byte *data, unsigned size);
+
+/* ---------- LZMA Decoder state ---------- */
+
+/* LZMA_REQUIRED_INPUT_MAX = number of required input bytes for worst case.
+   Num bits = log2((2^11 / 31) ^ 22) + 26 < 134 + 26 = 160; */
+
+#define LZMA_REQUIRED_INPUT_MAX 20
+
+typedef struct
+{
+  /* Don't change this structure. ASM code can use it. */
+  CLzmaProps prop;
+  CLzmaProb *probs;
+  CLzmaProb *probs_1664;
+  Byte *dic;
+  SizeT dicBufSize;
+  SizeT dicPos;
+  const Byte *buf;
+  UInt32 range;
+  UInt32 code;
+  UInt32 processedPos;
+  UInt32 checkDicSize;
+  UInt32 reps[4];
+  UInt32 state;
+  UInt32 remainLen;
+
+  UInt32 numProbs;
+  unsigned tempBufSize;
+  Byte tempBuf[LZMA_REQUIRED_INPUT_MAX];
+} CLzmaDec;
+
+#define LzmaDec_Construct(p) { (p)->dic = NULL; (p)->probs = NULL; }
+
+void LzmaDec_Init(CLzmaDec *p);
+
+/* There are two types of LZMA streams:
+	 - Stream with end mark. That end mark adds about 6 bytes to compressed size.
+	 - Stream without end mark. You must know exact uncompressed size to decompress such stream. */
+
+typedef enum
+{
+  LZMA_FINISH_ANY,   /* finish at any point */
+  LZMA_FINISH_END    /* block must be finished at the end */
+} ELzmaFinishMode;
+
+/* ELzmaFinishMode has meaning only if the decoding reaches output limit !!!
+
+   You must use LZMA_FINISH_END, when you know that current output buffer
+   covers last bytes of block. In other cases you must use LZMA_FINISH_ANY.
+
+   If LZMA decoder sees end marker before reaching output limit, it returns SZ_OK,
+   and output value of destLen will be less than output buffer size limit.
+   You can check status result also.
+
+   You can use multiple checks to test data integrity after full decompression:
+	 1) Check Result and "status" variable.
+	 2) Check that output(destLen) = uncompressedSize, if you know real uncompressedSize.
+	 3) Check that output(srcLen) = compressedSize, if you know real compressedSize.
+		You must use correct finish mode in that case. */
+
+typedef enum
+{
+  LZMA_STATUS_NOT_SPECIFIED,               /* use main error code instead */
+  LZMA_STATUS_FINISHED_WITH_MARK,          /* stream was finished with end mark. */
+  LZMA_STATUS_NOT_FINISHED,                /* stream was not finished */
+  LZMA_STATUS_NEEDS_MORE_INPUT,            /* you must provide more input bytes */
+  LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK  /* there is probability that stream was finished without end mark */
+} ELzmaStatus;
+
+/* ELzmaStatus is used only as output value for function call */
+
+/* ---------- Interfaces ---------- */
+
+/* There are 3 levels of interfaces:
+	 1) Dictionary Interface
+	 2) Buffer Interface
+	 3) One Call Interface
+   You can select any of these interfaces, but don't mix functions from different
+   groups for same object. */
+
+/* There are two variants to allocate state for Dictionary Interface:
+	 1) LzmaDec_Allocate / LzmaDec_Free
+	 2) LzmaDec_AllocateProbs / LzmaDec_FreeProbs
+   You can use variant 2, if you set dictionary buffer manually.
+   For Buffer Interface you must always use variant 1.
+
+LzmaDec_Allocate* can return:
+  SZ_OK
+  SZ_ERROR_MEM         - Memory allocation error
+  SZ_ERROR_UNSUPPORTED - Unsupported properties
+*/
+
+SRes LzmaDec_AllocateProbs(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
+void LzmaDec_FreeProbs(CLzmaDec *p, ISzAllocPtr alloc);
+
+SRes LzmaDec_Allocate(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
+void LzmaDec_Free(CLzmaDec *p, ISzAllocPtr alloc);
+
+/* ---------- Dictionary Interface ---------- */
+
+/* You can use it, if you want to eliminate the overhead for data copying from
+   dictionary to some other external buffer.
+   You must work with CLzmaDec variables directly in this interface.
+
+   STEPS:
+	 LzmaDec_Construct()
+	 LzmaDec_Allocate()
+	 for (each new stream)
+	 {
+	   LzmaDec_Init()
+	   while (it needs more decompression)
+	   {
+		 LzmaDec_DecodeToDic()
+		 use data from CLzmaDec::dic and update CLzmaDec::dicPos
+	   }
+	 }
+	 LzmaDec_Free()
+*/
+
+/* LzmaDec_DecodeToDic
+
+   The decoding to internal dictionary buffer (CLzmaDec::dic).
+   You must manually update CLzmaDec::dicPos, if it reaches CLzmaDec::dicBufSize !!!
+
+finishMode:
+  It has meaning only if the decoding reaches output limit (dicLimit).
+  LZMA_FINISH_ANY - Decode just dicLimit bytes.
+  LZMA_FINISH_END - Stream must be finished after dicLimit.
+
+Returns:
+  SZ_OK
+	status:
+	  LZMA_STATUS_FINISHED_WITH_MARK
+	  LZMA_STATUS_NOT_FINISHED
+	  LZMA_STATUS_NEEDS_MORE_INPUT
+	  LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK
+  SZ_ERROR_DATA - Data error
+*/
+
+SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit,
+	const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status);
+
+/* ---------- Buffer Interface ---------- */
+
+/* It's zlib-like interface.
+   See LzmaDec_DecodeToDic description for information about STEPS and return results,
+   but you must use LzmaDec_DecodeToBuf instead of LzmaDec_DecodeToDic and you don't need
+   to work with CLzmaDec variables manually.
+
+finishMode:
+  It has meaning only if the decoding reaches output limit (*destLen).
+  LZMA_FINISH_ANY - Decode just destLen bytes.
+  LZMA_FINISH_END - Stream must be finished after (*destLen).
+*/
+
+SRes LzmaDec_DecodeToBuf(CLzmaDec *p, Byte *dest, SizeT *destLen,
+	const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status);
+
+/* ---------- One Call Interface ---------- */
+
+/* LzmaDecode
+
+finishMode:
+  It has meaning only if the decoding reaches output limit (*destLen).
+  LZMA_FINISH_ANY - Decode just destLen bytes.
+  LZMA_FINISH_END - Stream must be finished after (*destLen).
+
+Returns:
+  SZ_OK
+	status:
+	  LZMA_STATUS_FINISHED_WITH_MARK
+	  LZMA_STATUS_NOT_FINISHED
+	  LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK
+  SZ_ERROR_DATA - Data error
+  SZ_ERROR_MEM  - Memory allocation error
+  SZ_ERROR_UNSUPPORTED - Unsupported properties
+  SZ_ERROR_INPUT_EOF - It needs more bytes in input buffer (src).
+*/
+
+SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
+	const Byte *propData, unsigned propSize, ELzmaFinishMode finishMode,
+	ELzmaStatus *status, ISzAllocPtr alloc);
+
+EXTERN_C_END
+
+#endif
+
+/*** End of inlined file: LzmaDec.h ***/
+
+
+/*** Start of inlined file: LzmaEnc.h ***/
+#ifndef __LZMA_ENC_H
+#define __LZMA_ENC_H
+
+EXTERN_C_BEGIN
+
+#define LZMA_PROPS_SIZE 5
+
+typedef struct _CLzmaEncProps
+{
+  int level;       /* 0 <= level <= 9 */
+  UInt32 dictSize; /* (1 << 12) <= dictSize <= (1 << 27) for 32-bit version
+					  (1 << 12) <= dictSize <= (3 << 29) for 64-bit version
+					  default = (1 << 24) */
+  int lc;          /* 0 <= lc <= 8, default = 3 */
+  int lp;          /* 0 <= lp <= 4, default = 0 */
+  int pb;          /* 0 <= pb <= 4, default = 2 */
+  int algo;        /* 0 - fast, 1 - normal, default = 1 */
+  int fb;          /* 5 <= fb <= 273, default = 32 */
+  int btMode;      /* 0 - hashChain Mode, 1 - binTree mode - normal, default = 1 */
+  int numHashBytes; /* 2, 3 or 4, default = 4 */
+  UInt32 mc;       /* 1 <= mc <= (1 << 30), default = 32 */
+  unsigned writeEndMark;  /* 0 - do not write EOPM, 1 - write EOPM, default = 0 */
+  int numThreads;  /* 1 or 2, default = 2 */
+
+  UInt64 reduceSize; /* estimated size of data that will be compressed. default = (UInt64)(Int64)-1.
+						Encoder uses this value to reduce dictionary size */
+} CLzmaEncProps;
+
+void LzmaEncProps_Init(CLzmaEncProps *p);
+void LzmaEncProps_Normalize(CLzmaEncProps *p);
+UInt32 LzmaEncProps_GetDictSize(const CLzmaEncProps *props2);
+
+/* ---------- CLzmaEncHandle Interface ---------- */
+
+/* LzmaEnc* functions can return the following exit codes:
+SRes:
+  SZ_OK           - OK
+  SZ_ERROR_MEM    - Memory allocation error
+  SZ_ERROR_PARAM  - Incorrect paramater in props
+  SZ_ERROR_WRITE  - ISeqOutStream write callback error
+  SZ_ERROR_OUTPUT_EOF - output buffer overflow - version with (Byte *) output
+  SZ_ERROR_PROGRESS - some break from progress callback
+  SZ_ERROR_THREAD - error in multithreading functions (only for Mt version)
+*/
+
+typedef void * CLzmaEncHandle;
+
+CLzmaEncHandle LzmaEnc_Create(ISzAllocPtr alloc);
+void LzmaEnc_Destroy(CLzmaEncHandle p, ISzAllocPtr alloc, ISzAllocPtr allocBig);
+
+SRes LzmaEnc_SetProps(CLzmaEncHandle p, const CLzmaEncProps *props);
+void LzmaEnc_SetDataSize(CLzmaEncHandle p, UInt64 expectedDataSiize);
+SRes LzmaEnc_WriteProperties(CLzmaEncHandle p, Byte *properties, SizeT *size);
+unsigned LzmaEnc_IsWriteEndMark(CLzmaEncHandle p);
+
+SRes LzmaEnc_Encode(CLzmaEncHandle p, ISeqOutStream *outStream, ISeqInStream *inStream,
+	ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
+SRes LzmaEnc_MemEncode(CLzmaEncHandle p, Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
+	int writeEndMark, ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
+
+/* ---------- One Call Interface ---------- */
+
+SRes LzmaEncode(Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
+	const CLzmaEncProps *props, Byte *propsEncoded, SizeT *propsSize, int writeEndMark,
+	ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
+
+EXTERN_C_END
+
+#endif
+
+/*** End of inlined file: LzmaEnc.h ***/
+
+
+/*** Start of inlined file: LzmaLib.h ***/
+#ifndef __LZMA_LIB_H
+#define __LZMA_LIB_H
+
+EXTERN_C_BEGIN
+
+#define MY_STDAPI int MY_STD_CALL
+
+#define LZMA_PROPS_SIZE 5
+
+/*
+RAM requirements for LZMA:
+  for compression:   (dictSize * 11.5 + 6 MB) + state_size
+  for decompression: dictSize + state_size
+	state_size = (4 + (1.5 << (lc + lp))) KB
+	by default (lc=3, lp=0), state_size = 16 KB.
+
+LZMA properties (5 bytes) format
+	Offset Size  Description
+	  0     1    lc, lp and pb in encoded form.
+	  1     4    dictSize (little endian).
+*/
+
+/*
+LzmaCompress
+------------
+
+outPropsSize -
+	 In:  the pointer to the size of outProps buffer; *outPropsSize = LZMA_PROPS_SIZE = 5.
+	 Out: the pointer to the size of written properties in outProps buffer; *outPropsSize = LZMA_PROPS_SIZE = 5.
+
+  LZMA Encoder will use defult values for any parameter, if it is
+  -1  for any from: level, loc, lp, pb, fb, numThreads
+   0  for dictSize
+
+level - compression level: 0 <= level <= 9;
+
+  level dictSize algo  fb
+	0:    16 KB   0    32
+	1:    64 KB   0    32
+	2:   256 KB   0    32
+	3:     1 MB   0    32
+	4:     4 MB   0    32
+	5:    16 MB   1    32
+	6:    32 MB   1    32
+	7+:   64 MB   1    64
+
+  The default value for "level" is 5.
+
+  algo = 0 means fast method
+  algo = 1 means normal method
+
+dictSize - The dictionary size in bytes. The maximum value is
+		128 MB = (1 << 27) bytes for 32-bit version
+		  1 GB = (1 << 30) bytes for 64-bit version
+	 The default value is 16 MB = (1 << 24) bytes.
+	 It's recommended to use the dictionary that is larger than 4 KB and
+	 that can be calculated as (1 << N) or (3 << N) sizes.
+
+lc - The number of literal context bits (high bits of previous literal).
+	 It can be in the range from 0 to 8. The default value is 3.
+	 Sometimes lc=4 gives the gain for big files.
+
+lp - The number of literal pos bits (low bits of current position for literals).
+	 It can be in the range from 0 to 4. The default value is 0.
+	 The lp switch is intended for periodical data when the period is equal to 2^lp.
+	 For example, for 32-bit (4 bytes) periodical data you can use lp=2. Often it's
+	 better to set lc=0, if you change lp switch.
+
+pb - The number of pos bits (low bits of current position).
+	 It can be in the range from 0 to 4. The default value is 2.
+	 The pb switch is intended for periodical data when the period is equal 2^pb.
+
+fb - Word size (the number of fast bytes).
+	 It can be in the range from 5 to 273. The default value is 32.
+	 Usually, a big number gives a little bit better compression ratio and
+	 slower compression process.
+
+numThreads - The number of thereads. 1 or 2. The default value is 2.
+	 Fast mode (algo = 0) can use only 1 thread.
+
+Out:
+  destLen  - processed output size
+Returns:
+  SZ_OK               - OK
+  SZ_ERROR_MEM        - Memory allocation error
+  SZ_ERROR_PARAM      - Incorrect paramater
+  SZ_ERROR_OUTPUT_EOF - output buffer overflow
+  SZ_ERROR_THREAD     - errors in multithreading functions (only for Mt version)
+*/
+
+MY_STDAPI LzmaCompress(unsigned char *dest, size_t *destLen, const unsigned char *src, size_t srcLen,
+  unsigned char *outProps, size_t *outPropsSize, /* *outPropsSize must be = 5 */
+  int level,      /* 0 <= level <= 9, default = 5 */
+  unsigned dictSize,  /* default = (1 << 24) */
+  int lc,        /* 0 <= lc <= 8, default = 3  */
+  int lp,        /* 0 <= lp <= 4, default = 0  */
+  int pb,        /* 0 <= pb <= 4, default = 2  */
+  int fb,        /* 5 <= fb <= 273, default = 32 */
+  int numThreads /* 1 or 2, default = 2 */
+  );
+
+/*
+LzmaUncompress
+--------------
+In:
+  dest     - output data
+  destLen  - output data size
+  src      - input data
+  srcLen   - input data size
+Out:
+  destLen  - processed output size
+  srcLen   - processed input size
+Returns:
+  SZ_OK                - OK
+  SZ_ERROR_DATA        - Data error
+  SZ_ERROR_MEM         - Memory allocation arror
+  SZ_ERROR_UNSUPPORTED - Unsupported properties
+  SZ_ERROR_INPUT_EOF   - it needs more bytes in input buffer (src)
+*/
+
+MY_STDAPI LzmaUncompress(unsigned char *dest, size_t *destLen, const unsigned char *src, SizeT *srcLen,
+  const unsigned char *props, size_t propsSize);
+
+EXTERN_C_END
+
+#endif
+
+/*** End of inlined file: LzmaLib.h ***/
+
+		#ifndef POCKETLZMA_LZMA_C_DEFINED
+		#define POCKETLZMA_LZMA_C_DEFINED
 
 /*** Start of inlined file: Alloc.c ***/
 #include <stdio.h>
@@ -708,16 +1143,16 @@ void BigFree(void *address)
 
 #endif
 
-inline static void *SzAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return MyAlloc(size); }
-inline static void SzFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); MyFree(address); }
+static void *SzAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return MyAlloc(size); }
+static void SzFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); MyFree(address); }
 const ISzAlloc g_Alloc = { SzAlloc, SzFree };
 
-inline static void *SzMidAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return MidAlloc(size); }
-inline static void SzMidFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); MidFree(address); }
+static void *SzMidAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return MidAlloc(size); }
+static void SzMidFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); MidFree(address); }
 const ISzAlloc g_MidAlloc = { SzMidAlloc, SzMidFree };
 
-inline static void *SzBigAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return BigAlloc(size); }
-inline static void SzBigFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); BigFree(address); }
+static void *SzBigAlloc(ISzAllocPtr p, size_t size) { UNUSED_VAR(p); return BigAlloc(size); }
+static void SzBigFree(ISzAllocPtr p, void *address) { UNUSED_VAR(p); BigFree(address); }
 const ISzAlloc g_BigAlloc = { SzBigAlloc, SzBigFree };
 
 /*
@@ -854,7 +1289,7 @@ const ISzAlloc g_AlignedAlloc = { SzAlignedAlloc, SzAlignedFree };
 #define REAL_BLOCK_PTR_VAR(p) ((void **)(p))[-1]
 */
 
-inline static void *AlignOffsetAlloc_Alloc(ISzAllocPtr pp, size_t size)
+static void *AlignOffsetAlloc_Alloc(ISzAllocPtr pp, size_t size)
 {
   CAlignOffsetAlloc *p = CONTAINER_FROM_VTBL(pp, CAlignOffsetAlloc, vt);
   void *adr;
@@ -897,7 +1332,7 @@ inline static void *AlignOffsetAlloc_Alloc(ISzAllocPtr pp, size_t size)
   return pAligned;
 }
 
-inline static void AlignOffsetAlloc_Free(ISzAllocPtr pp, void *address)
+static void AlignOffsetAlloc_Free(ISzAllocPtr pp, void *address)
 {
   if (address)
   {
@@ -917,233 +1352,6 @@ void AlignOffsetAlloc_CreateVTable(CAlignOffsetAlloc *p)
 
 /*** End of inlined file: Alloc.c ***/
 
-
-/*** Start of inlined file: LzmaDec.h ***/
-#ifndef __LZMA_DEC_H
-#define __LZMA_DEC_H
-
-EXTERN_C_BEGIN
-
-/* #define _LZMA_PROB32 */
-/* _LZMA_PROB32 can increase the speed on some CPUs,
-   but memory usage for CLzmaDec::probs will be doubled in that case */
-
-typedef
-#ifdef _LZMA_PROB32
-  UInt32
-#else
-  UInt16
-#endif
-  CLzmaProb;
-
-/* ---------- LZMA Properties ---------- */
-
-#define LZMA_PROPS_SIZE 5
-
-typedef struct _CLzmaProps
-{
-  Byte lc;
-  Byte lp;
-  Byte pb;
-  Byte _pad_;
-  UInt32 dicSize;
-} CLzmaProps;
-
-/* LzmaProps_Decode - decodes properties
-Returns:
-  SZ_OK
-  SZ_ERROR_UNSUPPORTED - Unsupported properties
-*/
-
-inline SRes LzmaProps_Decode(CLzmaProps *p, const Byte *data, unsigned size);
-
-/* ---------- LZMA Decoder state ---------- */
-
-/* LZMA_REQUIRED_INPUT_MAX = number of required input bytes for worst case.
-   Num bits = log2((2^11 / 31) ^ 22) + 26 < 134 + 26 = 160; */
-
-#define LZMA_REQUIRED_INPUT_MAX 20
-
-typedef struct
-{
-  /* Don't change this structure. ASM code can use it. */
-  CLzmaProps prop;
-  CLzmaProb *probs;
-  CLzmaProb *probs_1664;
-  Byte *dic;
-  SizeT dicBufSize;
-  SizeT dicPos;
-  const Byte *buf;
-  UInt32 range;
-  UInt32 code;
-  UInt32 processedPos;
-  UInt32 checkDicSize;
-  UInt32 reps[4];
-  UInt32 state;
-  UInt32 remainLen;
-
-  UInt32 numProbs;
-  unsigned tempBufSize;
-  Byte tempBuf[LZMA_REQUIRED_INPUT_MAX];
-} CLzmaDec;
-
-#define LzmaDec_Construct(p) { (p)->dic = NULL; (p)->probs = NULL; }
-
-inline void LzmaDec_Init(CLzmaDec *p);
-
-/* There are two types of LZMA streams:
-	 - Stream with end mark. That end mark adds about 6 bytes to compressed size.
-	 - Stream without end mark. You must know exact uncompressed size to decompress such stream. */
-
-typedef enum
-{
-  LZMA_FINISH_ANY,   /* finish at any point */
-  LZMA_FINISH_END    /* block must be finished at the end */
-} ELzmaFinishMode;
-
-/* ELzmaFinishMode has meaning only if the decoding reaches output limit !!!
-
-   You must use LZMA_FINISH_END, when you know that current output buffer
-   covers last bytes of block. In other cases you must use LZMA_FINISH_ANY.
-
-   If LZMA decoder sees end marker before reaching output limit, it returns SZ_OK,
-   and output value of destLen will be less than output buffer size limit.
-   You can check status result also.
-
-   You can use multiple checks to test data integrity after full decompression:
-	 1) Check Result and "status" variable.
-	 2) Check that output(destLen) = uncompressedSize, if you know real uncompressedSize.
-	 3) Check that output(srcLen) = compressedSize, if you know real compressedSize.
-		You must use correct finish mode in that case. */
-
-typedef enum
-{
-  LZMA_STATUS_NOT_SPECIFIED,               /* use main error code instead */
-  LZMA_STATUS_FINISHED_WITH_MARK,          /* stream was finished with end mark. */
-  LZMA_STATUS_NOT_FINISHED,                /* stream was not finished */
-  LZMA_STATUS_NEEDS_MORE_INPUT,            /* you must provide more input bytes */
-  LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK  /* there is probability that stream was finished without end mark */
-} ELzmaStatus;
-
-/* ELzmaStatus is used only as output value for function call */
-
-/* ---------- Interfaces ---------- */
-
-/* There are 3 levels of interfaces:
-	 1) Dictionary Interface
-	 2) Buffer Interface
-	 3) One Call Interface
-   You can select any of these interfaces, but don't mix functions from different
-   groups for same object. */
-
-/* There are two variants to allocate state for Dictionary Interface:
-	 1) LzmaDec_Allocate / LzmaDec_Free
-	 2) LzmaDec_AllocateProbs / LzmaDec_FreeProbs
-   You can use variant 2, if you set dictionary buffer manually.
-   For Buffer Interface you must always use variant 1.
-
-LzmaDec_Allocate* can return:
-  SZ_OK
-  SZ_ERROR_MEM         - Memory allocation error
-  SZ_ERROR_UNSUPPORTED - Unsupported properties
-*/
-
-inline SRes LzmaDec_AllocateProbs(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
-inline void LzmaDec_FreeProbs(CLzmaDec *p, ISzAllocPtr alloc);
-
-inline SRes LzmaDec_Allocate(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
-inline void LzmaDec_Free(CLzmaDec *p, ISzAllocPtr alloc);
-
-/* ---------- Dictionary Interface ---------- */
-
-/* You can use it, if you want to eliminate the overhead for data copying from
-   dictionary to some other external buffer.
-   You must work with CLzmaDec variables directly in this interface.
-
-   STEPS:
-	 LzmaDec_Construct()
-	 LzmaDec_Allocate()
-	 for (each new stream)
-	 {
-	   LzmaDec_Init()
-	   while (it needs more decompression)
-	   {
-		 LzmaDec_DecodeToDic()
-		 use data from CLzmaDec::dic and update CLzmaDec::dicPos
-	   }
-	 }
-	 LzmaDec_Free()
-*/
-
-/* LzmaDec_DecodeToDic
-
-   The decoding to internal dictionary buffer (CLzmaDec::dic).
-   You must manually update CLzmaDec::dicPos, if it reaches CLzmaDec::dicBufSize !!!
-
-finishMode:
-  It has meaning only if the decoding reaches output limit (dicLimit).
-  LZMA_FINISH_ANY - Decode just dicLimit bytes.
-  LZMA_FINISH_END - Stream must be finished after dicLimit.
-
-Returns:
-  SZ_OK
-	status:
-	  LZMA_STATUS_FINISHED_WITH_MARK
-	  LZMA_STATUS_NOT_FINISHED
-	  LZMA_STATUS_NEEDS_MORE_INPUT
-	  LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK
-  SZ_ERROR_DATA - Data error
-*/
-
-inline SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit,
-	const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status);
-
-/* ---------- Buffer Interface ---------- */
-
-/* It's zlib-like interface.
-   See LzmaDec_DecodeToDic description for information about STEPS and return results,
-   but you must use LzmaDec_DecodeToBuf instead of LzmaDec_DecodeToDic and you don't need
-   to work with CLzmaDec variables manually.
-
-finishMode:
-  It has meaning only if the decoding reaches output limit (*destLen).
-  LZMA_FINISH_ANY - Decode just destLen bytes.
-  LZMA_FINISH_END - Stream must be finished after (*destLen).
-*/
-
-inline SRes LzmaDec_DecodeToBuf(CLzmaDec *p, Byte *dest, SizeT *destLen,
-	const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status);
-
-/* ---------- One Call Interface ---------- */
-
-/* LzmaDecode
-
-finishMode:
-  It has meaning only if the decoding reaches output limit (*destLen).
-  LZMA_FINISH_ANY - Decode just destLen bytes.
-  LZMA_FINISH_END - Stream must be finished after (*destLen).
-
-Returns:
-  SZ_OK
-	status:
-	  LZMA_STATUS_FINISHED_WITH_MARK
-	  LZMA_STATUS_NOT_FINISHED
-	  LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK
-  SZ_ERROR_DATA - Data error
-  SZ_ERROR_MEM  - Memory allocation error
-  SZ_ERROR_UNSUPPORTED - Unsupported properties
-  SZ_ERROR_INPUT_EOF - It needs more bytes in input buffer (src).
-*/
-
-inline SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
-	const Byte *propData, unsigned propSize, ELzmaFinishMode finishMode,
-	ELzmaStatus *status, ISzAllocPtr alloc);
-
-EXTERN_C_END
-
-#endif
-
-/*** End of inlined file: LzmaDec.h ***/
 
 
 /*** Start of inlined file: LzmaDec.c ***/
@@ -2317,80 +2525,6 @@ SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
 }
 
 /*** End of inlined file: LzmaDec.c ***/
-
-
-/*** Start of inlined file: LzmaEnc.h ***/
-#ifndef __LZMA_ENC_H
-#define __LZMA_ENC_H
-
-EXTERN_C_BEGIN
-
-#define LZMA_PROPS_SIZE 5
-
-typedef struct _CLzmaEncProps
-{
-  int level;       /* 0 <= level <= 9 */
-  UInt32 dictSize; /* (1 << 12) <= dictSize <= (1 << 27) for 32-bit version
-					  (1 << 12) <= dictSize <= (3 << 29) for 64-bit version
-					  default = (1 << 24) */
-  int lc;          /* 0 <= lc <= 8, default = 3 */
-  int lp;          /* 0 <= lp <= 4, default = 0 */
-  int pb;          /* 0 <= pb <= 4, default = 2 */
-  int algo;        /* 0 - fast, 1 - normal, default = 1 */
-  int fb;          /* 5 <= fb <= 273, default = 32 */
-  int btMode;      /* 0 - hashChain Mode, 1 - binTree mode - normal, default = 1 */
-  int numHashBytes; /* 2, 3 or 4, default = 4 */
-  UInt32 mc;       /* 1 <= mc <= (1 << 30), default = 32 */
-  unsigned writeEndMark;  /* 0 - do not write EOPM, 1 - write EOPM, default = 0 */
-  int numThreads;  /* 1 or 2, default = 2 */
-
-  UInt64 reduceSize; /* estimated size of data that will be compressed. default = (UInt64)(Int64)-1.
-						Encoder uses this value to reduce dictionary size */
-} CLzmaEncProps;
-
-inline void LzmaEncProps_Init(CLzmaEncProps *p);
-inline void LzmaEncProps_Normalize(CLzmaEncProps *p);
-inline UInt32 LzmaEncProps_GetDictSize(const CLzmaEncProps *props2);
-
-/* ---------- CLzmaEncHandle Interface ---------- */
-
-/* LzmaEnc* functions can return the following exit codes:
-SRes:
-  SZ_OK           - OK
-  SZ_ERROR_MEM    - Memory allocation error
-  SZ_ERROR_PARAM  - Incorrect paramater in props
-  SZ_ERROR_WRITE  - ISeqOutStream write callback error
-  SZ_ERROR_OUTPUT_EOF - output buffer overflow - version with (Byte *) output
-  SZ_ERROR_PROGRESS - some break from progress callback
-  SZ_ERROR_THREAD - error in multithreading functions (only for Mt version)
-*/
-
-typedef void * CLzmaEncHandle;
-
-inline CLzmaEncHandle LzmaEnc_Create(ISzAllocPtr alloc);
-inline void LzmaEnc_Destroy(CLzmaEncHandle p, ISzAllocPtr alloc, ISzAllocPtr allocBig);
-
-inline SRes LzmaEnc_SetProps(CLzmaEncHandle p, const CLzmaEncProps *props);
-inline void LzmaEnc_SetDataSize(CLzmaEncHandle p, UInt64 expectedDataSiize);
-inline SRes LzmaEnc_WriteProperties(CLzmaEncHandle p, Byte *properties, SizeT *size);
-inline unsigned LzmaEnc_IsWriteEndMark(CLzmaEncHandle p);
-
-inline SRes LzmaEnc_Encode(CLzmaEncHandle p, ISeqOutStream *outStream, ISeqInStream *inStream,
-	ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
-inline SRes LzmaEnc_MemEncode(CLzmaEncHandle p, Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
-	int writeEndMark, ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
-
-/* ---------- One Call Interface ---------- */
-
-inline SRes LzmaEncode(Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
-	const CLzmaEncProps *props, Byte *propsEncoded, SizeT *propsSize, int writeEndMark,
-	ICompressProgress *progress, ISzAllocPtr alloc, ISzAllocPtr allocBig);
-
-EXTERN_C_END
-
-#endif
-
-/*** End of inlined file: LzmaEnc.h ***/
 
 
 /*** Start of inlined file: LzmaEnc.c ***/
@@ -6522,137 +6656,6 @@ void MatchFinder_CreateVTable(CMatchFinder *p, IMatchFinder *vTable)
 /*** End of inlined file: LzFind.c ***/
 
 
-/*** Start of inlined file: LzmaLib.h ***/
-#ifndef __LZMA_LIB_H
-#define __LZMA_LIB_H
-
-EXTERN_C_BEGIN
-
-#define MY_STDAPI int MY_STD_CALL
-
-#define LZMA_PROPS_SIZE 5
-
-/*
-RAM requirements for LZMA:
-  for compression:   (dictSize * 11.5 + 6 MB) + state_size
-  for decompression: dictSize + state_size
-	state_size = (4 + (1.5 << (lc + lp))) KB
-	by default (lc=3, lp=0), state_size = 16 KB.
-
-LZMA properties (5 bytes) format
-	Offset Size  Description
-	  0     1    lc, lp and pb in encoded form.
-	  1     4    dictSize (little endian).
-*/
-
-/*
-LzmaCompress
-------------
-
-outPropsSize -
-	 In:  the pointer to the size of outProps buffer; *outPropsSize = LZMA_PROPS_SIZE = 5.
-	 Out: the pointer to the size of written properties in outProps buffer; *outPropsSize = LZMA_PROPS_SIZE = 5.
-
-  LZMA Encoder will use defult values for any parameter, if it is
-  -1  for any from: level, loc, lp, pb, fb, numThreads
-   0  for dictSize
-
-level - compression level: 0 <= level <= 9;
-
-  level dictSize algo  fb
-	0:    16 KB   0    32
-	1:    64 KB   0    32
-	2:   256 KB   0    32
-	3:     1 MB   0    32
-	4:     4 MB   0    32
-	5:    16 MB   1    32
-	6:    32 MB   1    32
-	7+:   64 MB   1    64
-
-  The default value for "level" is 5.
-
-  algo = 0 means fast method
-  algo = 1 means normal method
-
-dictSize - The dictionary size in bytes. The maximum value is
-		128 MB = (1 << 27) bytes for 32-bit version
-		  1 GB = (1 << 30) bytes for 64-bit version
-	 The default value is 16 MB = (1 << 24) bytes.
-	 It's recommended to use the dictionary that is larger than 4 KB and
-	 that can be calculated as (1 << N) or (3 << N) sizes.
-
-lc - The number of literal context bits (high bits of previous literal).
-	 It can be in the range from 0 to 8. The default value is 3.
-	 Sometimes lc=4 gives the gain for big files.
-
-lp - The number of literal pos bits (low bits of current position for literals).
-	 It can be in the range from 0 to 4. The default value is 0.
-	 The lp switch is intended for periodical data when the period is equal to 2^lp.
-	 For example, for 32-bit (4 bytes) periodical data you can use lp=2. Often it's
-	 better to set lc=0, if you change lp switch.
-
-pb - The number of pos bits (low bits of current position).
-	 It can be in the range from 0 to 4. The default value is 2.
-	 The pb switch is intended for periodical data when the period is equal 2^pb.
-
-fb - Word size (the number of fast bytes).
-	 It can be in the range from 5 to 273. The default value is 32.
-	 Usually, a big number gives a little bit better compression ratio and
-	 slower compression process.
-
-numThreads - The number of thereads. 1 or 2. The default value is 2.
-	 Fast mode (algo = 0) can use only 1 thread.
-
-Out:
-  destLen  - processed output size
-Returns:
-  SZ_OK               - OK
-  SZ_ERROR_MEM        - Memory allocation error
-  SZ_ERROR_PARAM      - Incorrect paramater
-  SZ_ERROR_OUTPUT_EOF - output buffer overflow
-  SZ_ERROR_THREAD     - errors in multithreading functions (only for Mt version)
-*/
-
-MY_STDAPI LzmaCompress(unsigned char *dest, size_t *destLen, const unsigned char *src, size_t srcLen,
-  unsigned char *outProps, size_t *outPropsSize, /* *outPropsSize must be = 5 */
-  int level,      /* 0 <= level <= 9, default = 5 */
-  unsigned dictSize,  /* default = (1 << 24) */
-  int lc,        /* 0 <= lc <= 8, default = 3  */
-  int lp,        /* 0 <= lp <= 4, default = 0  */
-  int pb,        /* 0 <= pb <= 4, default = 2  */
-  int fb,        /* 5 <= fb <= 273, default = 32 */
-  int numThreads /* 1 or 2, default = 2 */
-  );
-
-/*
-LzmaUncompress
---------------
-In:
-  dest     - output data
-  destLen  - output data size
-  src      - input data
-  srcLen   - input data size
-Out:
-  destLen  - processed output size
-  srcLen   - processed input size
-Returns:
-  SZ_OK                - OK
-  SZ_ERROR_DATA        - Data error
-  SZ_ERROR_MEM         - Memory allocation arror
-  SZ_ERROR_UNSUPPORTED - Unsupported properties
-  SZ_ERROR_INPUT_EOF   - it needs more bytes in input buffer (src)
-*/
-
-MY_STDAPI LzmaUncompress(unsigned char *dest, size_t *destLen, const unsigned char *src, SizeT *srcLen,
-  const unsigned char *props, size_t propsSize);
-
-EXTERN_C_END
-
-#endif
-
-/*** End of inlined file: LzmaLib.h ***/
-
-
 /*** Start of inlined file: LzmaLib.c ***/
 MY_STDAPI LzmaCompress(unsigned char *dest, size_t *destLen, const unsigned char *src, size_t srcLen,
   unsigned char *outProps, size_t *outPropsSize,
@@ -6688,6 +6691,7 @@ MY_STDAPI LzmaUncompress(unsigned char *dest, size_t *destLen, const unsigned ch
 
 /*** End of inlined file: LzmaLib.c ***/
 
+		#endif //POCKETLZMA_LZMA_C_DEFINED
 	}
 }
 
@@ -6874,11 +6878,16 @@ namespace plz
 			{
 				Ok = 0,
 				FileWriteError = 100,
-				FileReadError = 200
+				FileWriteErrorBadBit = 101,
+				FileWriteErrorFailBit = 102,
+
+				FileReadError = 200,
+				FileReadErrorBadBit = 201,
+				FileReadErrorFailBit = 202
 			};
 
-			FileStatus() = default;
-			FileStatus(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message);
+			inline FileStatus() = default;
+			inline FileStatus(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message);
 
 			inline void set(FileStatus::Code status, int code, const std::string &exception, const std::string &category, const std::string &message);
 
@@ -7058,11 +7067,24 @@ namespace plz
 	FileStatus File::FromFile(const std::string &path, std::vector<uint8_t> &output)
 	{
 		std::fstream file;
-		file = std::fstream(path, std::ios::in | std::ios::binary);
-		file.exceptions(std::fstream::failbit | std::fstream::badbit);
-
 		try
 		{
+			file = std::fstream(path, std::ios::in | std::ios::binary);
+			file.exceptions(std::fstream::failbit | std::fstream::badbit);
+			bool isBad = file.bad();
+			bool isFail = file.fail();
+			bool isOpen = file.is_open();
+
+			if(isBad || isFail || !isOpen)
+				file.close();
+
+			if(isBad)
+				return FileStatus(FileStatus::Code::FileWriteErrorBadBit, 0, "", "", "");
+			else if(isFail)
+				return FileStatus(FileStatus::Code::FileWriteErrorFailBit, 0, "", "", "");
+			else if(!isOpen)
+				return FileStatus(FileStatus::Code::FileWriteError, 0, "", "", "");
+
 			//Find size
 			file.seekg(0, std::ios::end);
 			size_t fileSize = file.tellg();
@@ -7073,7 +7095,7 @@ namespace plz
 			file.read((char *) &output[0], fileSize);
 			file.close();
 		}
-		catch (std::fstream::failure e)
+		catch (const std::fstream::failure &e)
 		{
 			return FileStatus(FileStatus::Code::FileReadError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
 		}
@@ -7087,6 +7109,19 @@ namespace plz
 		try
 		{
 			file = std::fstream(path, std::ios::out | std::ios::binary);
+			bool isBad = file.bad();
+			bool isFail = file.fail();
+			bool isOpen = file.is_open();
+
+			if(isBad || isFail || !isOpen)
+				file.close();
+
+			if(isBad)
+				return FileStatus(FileStatus::Code::FileWriteErrorBadBit, 0, "", "", "");
+			else if(isFail)
+				return FileStatus(FileStatus::Code::FileWriteErrorFailBit, 0, "", "", "");
+			else if(!isOpen)
+				return FileStatus(FileStatus::Code::FileWriteError, 0, "", "", "");
 
 			for (const auto &b : data) //b = byte
 				file << b;
@@ -7094,8 +7129,11 @@ namespace plz
 			file.close();
 			return FileStatus();
 		}
-		catch (std::fstream::failure e)
+		catch (const std::fstream::failure &e)
 		{
+		    if(file.is_open())
+		        file.close();
+
 			return FileStatus(FileStatus::Code::FileWriteError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
 		}
 	}
