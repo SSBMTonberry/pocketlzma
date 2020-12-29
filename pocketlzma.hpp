@@ -7094,9 +7094,14 @@ namespace plz
 
 			file.read((char *) &output[0], fileSize);
 			file.close();
+
+			return FileStatus();
 		}
 		catch (const std::fstream::failure &e)
 		{
+			if(file.is_open())
+				file.close();
+
 			return FileStatus(FileStatus::Code::FileReadError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
 		}
 	}
@@ -7131,8 +7136,8 @@ namespace plz
 		}
 		catch (const std::fstream::failure &e)
 		{
-		    if(file.is_open())
-		        file.close();
+			if(file.is_open())
+				file.close();
 
 			return FileStatus(FileStatus::Code::FileWriteError, e.code().value(), e.what(), e.code().category().name(), e.code().message());
 		}
