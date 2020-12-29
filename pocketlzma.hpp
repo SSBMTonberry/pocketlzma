@@ -1,6 +1,31 @@
-//
-// Created by robin on 19.12.2020.
-//
+/*!
+ *  BSD 2-Clause License
+
+	Copyright (c) 2020, Robin Berg Pettersen
+	All rights reserved.
+
+	Redistribution and use in source and binary forms, with or without
+	modification, are permitted provided that the following conditions are met:
+
+	1. Redistributions of source code must retain the above copyright notice, this
+	   list of conditions and the following disclaimer.
+
+	2. Redistributions in binary form must reproduce the above copyright notice,
+	   this list of conditions and the following disclaimer in the documentation
+	   and/or other materials provided with the distribution.
+
+	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+	AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+	IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+	FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+	DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+	SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+	CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+	OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+	OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
 
 #ifndef POCKETLZMA_POCKETLZMA_H
 #define POCKETLZMA_POCKETLZMA_H
@@ -9,9 +34,6 @@ namespace plz
 {
 	namespace c
 	{
-		//Only single thread.
-		//#define _7ZIP_ST
-
 
 /*** Start of inlined file: 7zTypes.h ***/
 #ifndef __7Z_TYPES_H
@@ -361,6 +383,7 @@ EXTERN_C_END
 #endif
 
 /*** End of inlined file: 7zTypes.h ***/
+
 
 
 /*** Start of inlined file: Precomp.h ***/
@@ -6498,10 +6521,6 @@ void MatchFinder_CreateVTable(CMatchFinder *p, IMatchFinder *vTable)
 
 /*** End of inlined file: LzFind.c ***/
 
-		//#include "lzma_c/Threads.h"
-		//#include "lzma_c/Threads.c"
-		//#include "lzma_c/LzFindMt.c"
-
 
 /*** Start of inlined file: LzmaLib.h ***/
 #ifndef __LZMA_LIB_H
@@ -6671,6 +6690,362 @@ MY_STDAPI LzmaUncompress(unsigned char *dest, size_t *destLen, const unsigned ch
 
 	}
 }
+
+/*** Start of inlined file: pocketlzma_common.hpp ***/
+//
+// Created by robin on 29.12.2020.
+//
+
+#ifndef POCKETLZMA_POCKETLZMA_COMMON_HPP
+#define POCKETLZMA_POCKETLZMA_COMMON_HPP
+#include <vector>
+#include <cstdint>
+#include <memory>
+
+namespace plz
+{
+	const uint8_t PLZ_MAX_LEVEL {9};
+	const uint32_t PLZ_MIN_DICTIONARY_SIZE {1 << 8};
+	const uint32_t PLZ_MAX_DICTIONARY_SIZE {1 << 30};
+	const uint8_t PLZ_MAX_LITERAL_CONTEXT_BITS {8};
+	const uint8_t PLZ_MAX_LITERAL_POSITION_BITS {4};
+	const uint8_t PLZ_MAX_POSITION_BITS {4};
+	const uint16_t PLZ_MIN_FAST_BYTES {5};
+	const uint16_t PLZ_MAX_FAST_BYTES {273};
+
+	enum class StatusCode
+	{
+
+		Ok = SZ_OK, //0
+		ErrorData = SZ_ERROR_DATA, //1
+		ErrorMem = SZ_ERROR_MEM, //2
+		ErrorCrc = SZ_ERROR_CRC, //3
+		ErrorUnsupported = SZ_ERROR_UNSUPPORTED, //4
+		ErrorParam = SZ_ERROR_PARAM, //5
+		ErrorInputEof = SZ_ERROR_INPUT_EOF, //6
+		ErrorOutputEof = SZ_ERROR_OUTPUT_EOF, //7
+		ErrorRead = SZ_ERROR_READ, //8
+		ErrorWrite = SZ_ERROR_WRITE, //9
+		ErrorProgress = SZ_ERROR_PROGRESS, //10
+		ErrorFail = SZ_ERROR_FAIL, //11
+		ErrorThread = SZ_ERROR_THREAD, //12
+		ErrorArchive = SZ_ERROR_ARCHIVE, //16
+		ErrorNoArchive = SZ_ERROR_NO_ARCHIVE, //17
+
+		UndefinedError = 999
+	};
+}
+#endif //POCKETLZMA_POCKETLZMA_COMMON_HPP
+
+/*** End of inlined file: pocketlzma_common.hpp ***/
+
+
+
+/*** Start of inlined file: Settings.hpp ***/
+//
+// Created by robin on 29.12.2020.
+//
+
+#ifndef POCKETLZMA_SETTINGS_HPP
+#define POCKETLZMA_SETTINGS_HPP
+
+namespace plz
+{
+	class Settings
+	{
+		public:
+			Settings() = default;
+			/*!
+			 * Makes sure no values are out of valid range
+			 */
+			inline void validate();
+
+			/*!
+			 * level - compression level: 0 <= level <= 9;
+
+			 * level dictSize algo  fb
+			 *   0:    16 KB   0    32
+			 *   1:    64 KB   0    32
+			 *   2:   256 KB   0    32
+			 *   3:     1 MB   0    32
+			 *   4:     4 MB   0    32
+			 *   5:    16 MB   1    32
+			 *   6:    32 MB   1    32
+			 *   7+:   64 MB   1    64
+			 *
+			 * The default value for "level" is 5.
+			 *
+			 * algo = 0 means fast method
+			 * algo = 1 means normal method
+			 */
+			uint8_t level {5};
+
+			/*!
+			 * The dictionary size in bytes. The maximum value is
+			 * 128 MB = (1 << 27) bytes for 32-bit version
+			 *   1 GB = (1 << 30) bytes for 64-bit version
+			 * The default value is 16 MB = (1 << 24) bytes.
+			 * It's recommended to use the dictionary that is larger than 4 KB and
+			 * that can be calculated as (1 << N) or (3 << N) sizes.
+			 *
+			 * pocketlzma has a lower limit of (1 << 8) (256 bytes)
+			 */
+			uint32_t dictionarySize {1 << 24};
+
+			/*!
+			 * lc - The number of literal context bits (high bits of previous literal).
+			 * It can be in the range from 0 to 8. The default value is 3.
+			 * Sometimes lc=4 gives the gain for big files.
+			 */
+			uint8_t literalContextBits {3};
+
+			/*!
+			 * lp - The number of literal pos bits (low bits of current position for literals).
+			 * It can be in the range from 0 to 4. The default value is 0.
+			 * The lp switch is intended for periodical data when the period is equal to 2^lp.
+			 * For example, for 32-bit (4 bytes) periodical data you can use lp=2. Often it's
+			 * better to set lc=0, if you change lp switch.
+			 */
+			uint8_t literalPositionBits {0};
+
+			/*!
+			 * pb - The number of pos bits (low bits of current position).
+					It can be in the range from 0 to 4. The default value is 2.
+					The pb switch is intended for periodical data when the period is equal 2^pb.
+			 */
+			uint8_t positionBits {2};
+
+			/*!
+			 * fb - Word size (the number of fast bytes).
+			 *      It can be in the range from 5 to 273. The default value is 32.
+			 *      Usually, a big number gives a little bit better compression ratio and
+			 *      slower compression process.
+			 */
+			uint16_t fastBytes {32};
+	};
+
+	void Settings::validate()
+	{
+		if(level > PLZ_MAX_LEVEL)
+			level = PLZ_MAX_LEVEL;
+
+		if(dictionarySize < PLZ_MIN_DICTIONARY_SIZE)
+			dictionarySize = PLZ_MIN_DICTIONARY_SIZE;
+		else if(dictionarySize > PLZ_MAX_DICTIONARY_SIZE)
+			dictionarySize = PLZ_MAX_DICTIONARY_SIZE;
+
+		if(literalContextBits > PLZ_MAX_LITERAL_CONTEXT_BITS)
+			literalContextBits = PLZ_MAX_LITERAL_CONTEXT_BITS;
+
+		if(literalPositionBits > PLZ_MAX_LITERAL_POSITION_BITS)
+			literalPositionBits = PLZ_MAX_LITERAL_POSITION_BITS;
+
+		if(positionBits > PLZ_MAX_POSITION_BITS)
+			positionBits = PLZ_MAX_POSITION_BITS;
+
+		if(fastBytes < PLZ_MIN_FAST_BYTES)
+			fastBytes = PLZ_MIN_FAST_BYTES;
+		else if(fastBytes > PLZ_MAX_FAST_BYTES)
+			fastBytes = PLZ_MAX_FAST_BYTES;
+
+	}
+}
+
+#endif //POCKETLZMA_SETTINGS_HPP
+
+/*** End of inlined file: Settings.hpp ***/
+
+
+/*** Start of inlined file: File.hpp ***/
+//
+// Created by robin on 28.12.2020.
+//
+
+#ifndef POCKETLZMA_FILE_HPP
+#define POCKETLZMA_FILE_HPP
+
+
+/*** Start of inlined file: MemoryStream.hpp ***/
+//
+// Created by robin on 28.12.2020.
+//
+
+#ifndef POCKETLZMA_MEMORYSTREAM_HPP
+#define POCKETLZMA_MEMORYSTREAM_HPP
+
+
+/*** Start of inlined file: MemoryBuffer.hpp ***/
+//
+// Created by robin on 28.12.2020.
+//
+
+#ifndef POCKETLZMA_MEMORYBUFFER_HPP
+#define POCKETLZMA_MEMORYBUFFER_HPP
+
+#include <iostream>
+
+namespace plz
+{
+	class MemoryBuffer : public std::basic_streambuf<char> {
+		public:
+			MemoryBuffer(const uint8_t *p, size_t l) {
+				setg((char*)p, (char*)p, (char*)p + l);
+			}
+	};
+}
+
+#endif //POCKETLZMA_MEMORYBUFFER_HPP
+
+/*** End of inlined file: MemoryBuffer.hpp ***/
+
+namespace plz
+{
+	class MemoryStream : public std::istream {
+		public:
+			MemoryStream(const uint8_t *p, size_t l) :
+					std::istream(&m_buffer),
+					m_buffer(p, l)
+			{
+				m_size = l;
+				rdbuf(&m_buffer);
+			}
+
+			size_t size() const { return m_size; }
+
+		private:
+			MemoryBuffer m_buffer;
+			size_t m_size;
+	};
+}
+
+#endif //POCKETLZMA_MEMORYSTREAM_HPP
+
+/*** End of inlined file: MemoryStream.hpp ***/
+
+namespace plz
+{
+	class File
+	{
+		public:
+			File() = delete;
+			static inline std::vector<uint8_t> FromMemory(const void *data, size_t size);
+			static inline void FromMemory(const void *data, size_t size, std::vector<uint8_t> &output);
+
+			static inline std::vector<uint8_t> FromFile(const std::string &path);
+			static inline void FromFile(const std::string &path, std::vector<uint8_t> &output);
+
+			static inline void ToFile(const std::string &path, const std::vector<uint8_t> &data);
+	};
+
+	std::vector<uint8_t> File::FromMemory(const void *data, size_t size)
+	{
+		std::vector<uint8_t> bytes(size);
+		FromMemory(data, size, bytes);
+		return bytes;
+	}
+
+	void File::FromMemory(const void *data, size_t size, std::vector<uint8_t> &output)
+	{
+		plz::MemoryStream mem {(uint8_t *)data, size};
+		mem.read((char *)&output[0], size);
+	}
+
+	std::vector<uint8_t> File::FromFile(const std::string &path)
+	{
+		std::fstream file;
+		file = std::fstream(path, std::ios::in | std::ios::binary);
+
+		//Find size
+		file.seekg(0, std::ios::end);
+		size_t fileSize = file.tellg();
+		file.seekg(0, std::ios::beg);
+
+		std::vector<uint8_t> bytes(fileSize);
+
+		file.read((char *)&bytes[0], fileSize);
+		file.close();
+
+		return bytes;
+	}
+
+	void File::FromFile(const std::string &path, std::vector<uint8_t> &output)
+	{
+		std::fstream file;
+		file = std::fstream(path, std::ios::in | std::ios::binary);
+
+		//Find size
+		file.seekg(0, std::ios::end);
+		size_t fileSize = file.tellg();
+		file.seekg(0, std::ios::beg);
+
+		output.resize(fileSize);
+
+		file.read((char *)&output[0], fileSize);
+		file.close();
+	}
+
+	void File::ToFile(const std::string &path, const std::vector<uint8_t> &data)
+	{
+		std::fstream file;
+		file = std::fstream(path, std::ios::out | std::ios::binary);
+
+		for(const auto &b : data) //b = byte
+			file << b;
+
+		file.close();
+	}
+}
+
+#endif //POCKETLZMA_FILE_HPP
+
+/*** End of inlined file: File.hpp ***/
+
+
+/*** Start of inlined file: pocketlzma_class.hpp ***/
+//
+// Created by robin on 29.12.2020.
+//
+
+#ifndef POCKETLZMA_POCKETLZMA_CLASS_HPP
+#define POCKETLZMA_POCKETLZMA_CLASS_HPP
+
+namespace plz
+{
+	class PocketLzma
+	{
+		public:
+			PocketLzma() = default;
+
+			inline StatusCode compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output);
+
+		private:
+			Settings m_settings {};
+	};
+
+	StatusCode PocketLzma::compress(const std::vector <uint8_t> &input, std::vector <uint8_t> &output)
+	{
+		m_settings.validate();
+		size_t propsSize = LZMA_PROPS_SIZE;
+		//uint8_t propsEncoded[propsSize + 8];
+		uint8_t propsEncoded[propsSize];
+		size_t outSize = input.size();
+		uint8_t out[outSize];
+
+		int rc = plz::c::LzmaCompress(out, &outSize, &input[0], input.size(), propsEncoded, &propsSize, m_settings.level, m_settings.dictionarySize,
+							 m_settings.literalContextBits,m_settings.literalPositionBits,m_settings.positionBits,m_settings.fastBytes,1);
+
+		std::vector<uint8_t> buffer(out, out + outSize);
+		output.insert(output.end(), buffer.begin(), buffer.end());
+
+		StatusCode status = static_cast<StatusCode>(rc);
+
+		return status;
+	}
+}
+
+#endif //POCKETLZMA_POCKETLZMA_CLASS_HPP
+
+/*** End of inlined file: pocketlzma_class.hpp ***/
 
 #endif //POCKETLZMA_POCKETLZMA_H
 

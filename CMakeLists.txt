@@ -120,9 +120,15 @@ option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 #         src/external/lzma/liblzma/lzma/lzma_encoder_presets.c
 #         )
 
-set(SOURCE_FILES src/pocketlzma.h src/interfaces/IDecompressor.hpp src/interfaces/ICompressor.hpp
-        src/pocketlzma_common.h src/main.cpp src/compress/Lzma2Compressor.hpp src/common/Lzma2Coder.hpp
-        src/common/LzmaOptions.hpp src/compress/LzmaCompressor.hpp src/common/CommonFunctions.hpp src/common/LzmaMF.hpp src/common/LzmaMatch.hpp src/common/Lzma1Encoder.hpp src/common/RangeEncoder.hpp src/common/LengthEncoder.hpp src/common/LzmaOptimal.hpp src/common/Price.hpp src/misc/MemoryBuffer.hpp src/misc/MemoryStream.hpp src/misc/File.hpp src/common/Fastpos.hpp src/common/LzOptions.hpp)
+# set(SOURCE_FILES src/pocketlzma.h src/interfaces/IDecompressor.hpp src/interfaces/ICompressor.hpp
+#         src/pocketlzma_common.h src/main.cpp src/compress/Lzma2Compressor.hpp src/common/Lzma2Coder.hpp
+#         src/common/LzmaOptions.hpp src/compress/LzmaCompressor.hpp src/common/CommonFunctions.hpp src/common/LzmaMF.hpp
+#         src/common/LzmaMatch.hpp src/common/Lzma1Encoder.hpp src/common/RangeEncoder.hpp src/common/LengthEncoder.hpp
+#         src/common/LzmaOptimal.hpp src/common/Price.hpp src/misc/MemoryBuffer.hpp src/misc/MemoryStream.hpp
+#         src/misc/File.hpp src/common/Fastpos.hpp src/common/LzOptions.hpp src/pocketlzma_class.hpp src/Settings.hpp src/pocketlzma_common.hpp)
+
+ set(SOURCE_FILES src_old/main.cpp src/pocketlzma_common.hpp src/pocketlzma.h src/misc/MemoryBuffer.hpp src/misc/MemoryStream.hpp
+         src/misc/File.hpp src/pocketlzma_class.hpp src/Settings.hpp )
 
 # Only activated for code completion, must be uncommented before release!
 add_library(pocketlzma ${SOURCE_FILES} ${LZMA_SOURCE_FILES}) #dummy build

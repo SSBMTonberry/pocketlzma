@@ -16,10 +16,6 @@
 
 #include "LzFind.h"
 
-#ifndef _7ZIP_ST
-#include "LzFindMt.h"
-#endif
-
 #ifdef SHOW_STAT
 static unsigned g_STAT_OFFSET = 0;
 #endif
@@ -79,12 +75,8 @@ void LzmaEncProps_Normalize(CLzmaEncProps *p)
   if (p->mc == 0) p->mc = (16 + (p->fb >> 1)) >> (p->btMode ? 0 : 1);
   
   if (p->numThreads < 0)
-    p->numThreads =
-      #ifndef _7ZIP_ST
-      ((p->btMode && p->algo) ? 2 : 1);
-      #else
-      1;
-      #endif
+    p->numThreads = 1;
+
 }
 
 UInt32 LzmaEncProps_GetDictSize(const CLzmaEncProps *props2)
@@ -340,18 +332,7 @@ typedef struct
   UInt32 dictSize;
   SRes result;
 
-  #ifndef _7ZIP_ST
-  BoolInt mtMode;
-  // begin of CMatchFinderMt is used in LZ thread
-  CMatchFinderMt matchFinderMt;
-  // end of CMatchFinderMt is used in BT and HASH threads
-  #endif
-
   CMatchFinder matchFinderBase;
-
-  #ifndef _7ZIP_ST
-  Byte pad[128];
-  #endif
   
   // LZ thread
   CProbPrice ProbPrices[kBitModelTotal >> kNumMoveReducingBits];
@@ -386,9 +367,6 @@ typedef struct
 
   CSaveState saveState;
 
-  #ifndef _7ZIP_ST
-  Byte pad2[128];
-  #endif
 } CLzmaEnc;
 
 
@@ -491,17 +469,6 @@ SRes LzmaEnc_SetProps(CLzmaEncHandle pp, const CLzmaEncProps *props2)
   p->matchFinderBase.cutValue = props.mc;
 
   p->writeEndMark = props.writeEndMark;
-
-  #ifndef _7ZIP_ST
-  /*
-  if (newMultiThread != _multiThread)
-  {
-    ReleaseMatchFinder();
-    _multiThread = newMultiThread;
-  }
-  */
-  p->multiThread = (props.numThreads > 1);
-  #endif
 
   return SZ_OK;
 }
@@ -2203,11 +2170,6 @@ void LzmaEnc_Construct(CLzmaEnc *p)
 {
   RangeEnc_Construct(&p->rc);
   MatchFinder_Construct(&p->matchFinderBase);
-  
-  #ifndef _7ZIP_ST
-  MatchFinderMt_Construct(&p->matchFinderMt);
-  p->matchFinderMt.MatchFinder = &p->matchFinderBase;
-  #endif
 
   {
     CLzmaEncProps props;
@@ -2244,10 +2206,6 @@ void LzmaEnc_FreeLits(CLzmaEnc *p, ISzAllocPtr alloc)
 
 void LzmaEnc_Destruct(CLzmaEnc *p, ISzAllocPtr alloc, ISzAllocPtr allocBig)
 {
-  #ifndef _7ZIP_ST
-  MatchFinderMt_Destruct(&p->matchFinderMt, allocBig);
-  #endif
-  
   MatchFinder_Free(&p->matchFinderBase, allocBig);
   LzmaEnc_FreeLits(p, alloc);
   RangeEnc_Free(&p->rc, alloc);
@@ -2563,10 +2521,6 @@ static SRes LzmaEnc_Alloc(CLzmaEnc *p, UInt32 keepWindowSize, ISzAllocPtr alloc,
   if (!RangeEnc_Alloc(&p->rc, alloc))
     return SZ_ERROR_MEM;
 
-  #ifndef _7ZIP_ST
-  p->mtMode = (p->multiThread && !p->fastMode && (p->matchFinderBase.btMode != 0));
-  #endif
-
   {
     unsigned lclp = p->lc + p->lp;
     if (!p->litProbs || !p->saveState.litProbs || p->lclp != lclp)
@@ -2588,20 +2542,7 @@ static SRes LzmaEnc_Alloc(CLzmaEnc *p, UInt32 keepWindowSize, ISzAllocPtr alloc,
   if (beforeSize + p->dictSize < keepWindowSize)
     beforeSize = keepWindowSize - p->dictSize;
 
-  #ifndef _7ZIP_ST
-  if (p->mtMode)
-  {
-    RINOK(MatchFinderMt_Create(&p->matchFinderMt, p->dictSize, beforeSize, p->numFastBytes,
-        LZMA_MATCH_LEN_MAX
-        + 1  /* 18.04 */
-        , allocBig));
-    p->matchFinderObj = &p->matchFinderMt;
-    p->matchFinderBase.bigHash = (Byte)(
-        (p->dictSize > kBigHashDicLimit && p->matchFinderBase.hashMask >= 0xFFFFFF) ? 1 : 0);
-    MatchFinderMt_CreateVTable(&p->matchFinderMt, &p->matchFinder);
-  }
-  else
-  #endif
+
   {
     if (!MatchFinder_Create(&p->matchFinderBase, p->dictSize, beforeSize, p->numFastBytes, LZMA_MATCH_LEN_MAX, allocBig))
       return SZ_ERROR_MEM;
@@ -2756,13 +2697,7 @@ SRes LzmaEnc_MemPrepare(CLzmaEncHandle pp, const Byte *src, SizeT srcLen,
 
 void LzmaEnc_Finish(CLzmaEncHandle pp)
 {
-  #ifndef _7ZIP_ST
-  CLzmaEnc *p = (CLzmaEnc *)pp;
-  if (p->mtMode)
-    MatchFinderMt_ReleaseStream(&p->matchFinderMt);
-  #else
-  UNUSED_VAR(pp);
-  #endif
+  UNUSED_VAR(pp)
 }
 
 
@@ -2845,12 +2780,6 @@ SRes LzmaEnc_CodeOneMemBlock(CLzmaEncHandle pp, BoolInt reInit,
 static SRes LzmaEnc_Encode2(CLzmaEnc *p, ICompressProgress *progress)
 {
   SRes res = SZ_OK;
-
-  #ifndef _7ZIP_ST
-  Byte allocaDummy[0x300];
-  allocaDummy[0] = 0;
-  allocaDummy[1] = allocaDummy[0];
-  #endif
 
   for (;;)
   {
