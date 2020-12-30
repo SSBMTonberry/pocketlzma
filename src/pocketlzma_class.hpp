@@ -58,7 +58,7 @@ namespace plz
                 sizeBits.push_back((input.size() >> (i * 8)) & 0xFF);
 
             output.insert(output.end(), propsEncoded, propsEncoded + propsSize);
-            output.insert(output.end(), sizeBits.begin(), sizeBits.end());
+            output.insert(output.end(), sizeBits.begin(), sizeBits.end()); //Add decompress size information
             output.insert(output.end(), out, out + outSize);
         }
 
@@ -81,8 +81,19 @@ namespace plz
         //Extract size
 
         size_t size = 0;//5000000;
+        bool sizeInfoMissing = true; //True until proven otherwise
+
         for (int i = 0; i < 8; i++)
+        {
+            uint8_t value = input[5 + i];
+            if(value != 0xFF)
+                sizeInfoMissing = false;
+
             size |= (input[5 + i] << (i * 8));
+        }
+
+        if(sizeInfoMissing)
+            return StatusCode::MissingSizeInfoInHeader;
 
         //uint8_t *out;
         //std::unique_ptr<uint8_t> out = std::unique_ptr<uint8_t>();

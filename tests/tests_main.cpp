@@ -83,6 +83,19 @@ TEST_CASE( "Decompress lzma-json  - expect larger size and success", "[compressi
     plz::File::ToFile(pathOut, output);
 }
 
+TEST_CASE( "Decompress lzma-json with missing size header - expect missing header error", "[compression]" )
+{
+    std::string path = "./../../content/to_decompress/from/json_test.json.lzma";
+    std::vector<uint8_t> input = plz::File::FromFile(path);
+
+    plz::PocketLzma p;
+
+    std::vector<uint8_t> output;
+    plz::StatusCode status = p.decompress(input, output);
+
+    REQUIRE(status == plz::StatusCode::MissingSizeInfoInHeader);
+}
+
 //TEST_CASE( "Basic test", "[basic]" )
 //{
 //    std::unique_ptr<plz::ICompressor> compressor {new plz::Lzma2Compressor()}; //The nasty C++11 way

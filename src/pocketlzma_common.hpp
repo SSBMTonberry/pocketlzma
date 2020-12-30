@@ -38,6 +38,11 @@ namespace plz
         ErrorArchive = SZ_ERROR_ARCHIVE, //16
         ErrorNoArchive = SZ_ERROR_NO_ARCHIVE, //17
 
+        /*!
+         * When attempting to decompress, but size info is missing in header.
+         */
+        MissingSizeInfoInHeader = 100,
+
         UndefinedError = 999
     };
 }
