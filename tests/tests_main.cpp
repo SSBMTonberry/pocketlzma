@@ -29,7 +29,19 @@ TEST_CASE("Dummy", "[dumdum]")
 
 }
 
-TEST_CASE( "Compress json with default settings- expect smaller compressed size", "[compression]" )
+TEST_CASE( "Compress a ridiculously small byte buffer - pray that it works", "[compression]" )
+{
+
+    plz::PocketLzma p;
+
+    std::vector<uint8_t> input {34, 32, 156, 4, 4, 4, 9};
+    std::vector<uint8_t> output;
+    plz::StatusCode status = p.compress(input, output);
+
+    REQUIRE(status == plz::StatusCode::Ok);
+}
+
+TEST_CASE( "Compress json with default settings - expect smaller compressed size then same data when uncompressed", "[compression]" )
 {
     std::string path = "./../../content/to_compress/from/json_test.json";
     std::string pathOut = "./../../content/to_compress/to/json_test.lzma";
@@ -39,9 +51,34 @@ TEST_CASE( "Compress json with default settings- expect smaller compressed size"
 
     std::vector<uint8_t> output;
     plz::StatusCode status = p.compress(input, output);
-    
+
     REQUIRE(status == plz::StatusCode::Ok);
     REQUIRE(output.size() < input.size());
+
+    plz::File::ToFile(pathOut, output);
+
+    std::vector<uint8_t> decompressOutput;
+    plz::StatusCode decompStats = p.decompress(output, decompressOutput);
+
+    REQUIRE(decompStats == plz::StatusCode::Ok);
+    REQUIRE(input.size() == decompressOutput.size());
+
+}
+
+TEST_CASE( "Decompress lzma-json  - expect larger size and success", "[compression]" )
+{
+    //std::string path = "./../../content/to_decompress/from/json_test.json.lzma";
+    std::string path = "./../../content/to_decompress/from/json_test2.lzma";
+    std::string pathOut = "./../../content/to_decompress/to/json_test.json";
+    std::vector<uint8_t> input = plz::File::FromFile(path);
+
+    plz::PocketLzma p;
+
+    std::vector<uint8_t> output;
+    plz::StatusCode status = p.decompress(input, output);
+
+    REQUIRE(status == plz::StatusCode::Ok);
+    REQUIRE(output.size() > input.size());
 
     plz::File::ToFile(pathOut, output);
 }
