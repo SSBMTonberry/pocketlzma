@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include "../external_libs/catch.hpp"
 
-#define POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
+//#define POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
 
 #ifdef POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
     #include "../pocketlzma.hpp"
@@ -39,8 +39,7 @@ TEST_CASE( "Compress json with default settings- expect smaller compressed size"
 
     std::vector<uint8_t> output;
     plz::StatusCode status = p.compress(input, output);
-
-
+    
     REQUIRE(status == plz::StatusCode::Ok);
     REQUIRE(output.size() < input.size());
 

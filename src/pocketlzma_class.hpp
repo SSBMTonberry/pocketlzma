@@ -39,8 +39,11 @@ namespace plz
         int rc = plz::c::LzmaCompress(out, &outSize, &input[0], input.size(), propsEncoded, &propsSize, m_settings.level, m_settings.dictionarySize,
                              m_settings.literalContextBits,m_settings.literalPositionBits,m_settings.positionBits,m_settings.fastBytes,1);
 
-        std::vector<uint8_t> buffer(out, out + outSize);
-        output.insert(output.end(), buffer.begin(), buffer.end());
+        //std::vector<uint8_t> buffer(out, out + outSize);
+        //output.insert(output.end(), buffer.begin(), buffer.end());
+
+        //output.resize(outSize);
+        output.insert(output.end(), out, out + outSize);
 
         StatusCode status = static_cast<StatusCode>(rc);
 

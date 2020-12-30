@@ -4,7 +4,7 @@
 
 #include "../external_libs/catch.hpp"
 
-#define POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
+//#define POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
 
 #define POCKETLZMA_LZMA_C_DEFINED
 
@@ -43,4 +43,10 @@ TEST_CASE("Write random data to file then read - expect success", "[dumdum]")
 
     plz::FileStatus read = plz::File::FromFile(pathOut, bytesRead);
     REQUIRE(read.status() == plz::FileStatus::Code::Ok);
+
+    //Also read from a non-existant endpoint
+    std::vector<uint8_t> bytesRead2;
+    std::string pathInvalid = "./../../content/file_tests_fail/fileblobba.txt";
+    plz::FileStatus read2 = plz::File::FromFile(pathInvalid, bytesRead2);
+    REQUIRE(read2.status() == plz::FileStatus::Code::FileReadError);
 }
