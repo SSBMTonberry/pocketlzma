@@ -45,5 +45,14 @@ namespace plz
 
         UndefinedError = 999
     };
+
+    enum class Preset : uint8_t
+    {
+        Default = 0,
+        Fastest = 1,
+        Fast = 2,
+        GoodCompression = 3,
+        BestCompression = 4
+    };
 }
 #endif //POCKETLZMA_POCKETLZMA_COMMON_HPP

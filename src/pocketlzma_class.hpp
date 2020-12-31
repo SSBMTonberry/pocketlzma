@@ -11,8 +11,10 @@ namespace plz
     {
         public:
             PocketLzma() = default;
-            explicit PocketLzma(const Settings &settings) : m_settings {settings} {};
+            inline explicit PocketLzma(Preset preset);
+            inline explicit PocketLzma(const Settings &settings) : m_settings {settings} {};
             inline void setSettings(const Settings &settings);
+            inline void usePreset (Preset preset);
 
             inline StatusCode compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output);
             inline StatusCode decompress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output);
@@ -20,6 +22,12 @@ namespace plz
         private:
             Settings m_settings {};
     };
+
+    PocketLzma::PocketLzma(Preset preset)
+    {
+        usePreset(preset);
+    }
+
     /*!
      * This is optional. PocketLzma uses default values if not set by the user.
      * @param settings new settings
@@ -27,6 +35,11 @@ namespace plz
     void PocketLzma::setSettings(const Settings &settings)
     {
         m_settings = settings;
+    }
+
+    void PocketLzma::usePreset(Preset preset)
+    {
+        m_settings.usePreset(preset);
     }
 
     StatusCode PocketLzma::compress(const std::vector <uint8_t> &input, std::vector <uint8_t> &output)
@@ -86,6 +99,7 @@ namespace plz
 
         return status;
     }
+
 
 }
 

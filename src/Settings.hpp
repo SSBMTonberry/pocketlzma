@@ -10,11 +10,15 @@ namespace plz
     class Settings
     {
         public:
+
             Settings() = default;
+            inline explicit Settings(Preset preset);
             /*!
              * Makes sure no values are out of valid range
              */
             inline void validate();
+
+            inline void usePreset(Preset preset);
 
             /*!
              * level - compression level: 0 <= level <= 9;
@@ -80,6 +84,11 @@ namespace plz
             uint16_t fastBytes {32};
     };
 
+    Settings::Settings(Preset preset)
+    {
+        usePreset(preset);
+    }
+
     void Settings::validate()
     {
         if(level > PLZ_MAX_LEVEL)
@@ -105,6 +114,61 @@ namespace plz
             fastBytes = PLZ_MAX_FAST_BYTES;
 
     }
+
+    void Settings::usePreset(Preset preset)
+    {
+        switch(preset)
+        {
+            case Preset::Default:
+                level = 5;
+                dictionarySize = 1 << 24;
+                literalContextBits = 3;
+                literalPositionBits = 0;
+                positionBits = 2;
+                fastBytes = 32;
+                break;
+
+            case Preset::Fastest:
+                level = 1;
+                dictionarySize = 1 << 16;
+                literalContextBits = 4;
+                literalPositionBits = 0;
+                positionBits = 2;
+                fastBytes = 8;
+                break;
+
+            case Preset::Fast:
+                level = 4;
+                dictionarySize = 1 << 22;
+                literalContextBits = 4;
+                literalPositionBits = 0;
+                positionBits = 2;
+                fastBytes = 16;
+                break;
+
+            case Preset::GoodCompression:
+                level = 7;
+                dictionarySize = 1 << 26;
+                literalContextBits = 3;
+                literalPositionBits = 0;
+                positionBits = 2;
+                fastBytes = 64;
+                break;
+
+            case Preset::BestCompression:
+                level = 9;
+                dictionarySize = 1 << 27;
+                literalContextBits = 3;
+                literalPositionBits = 0;
+                positionBits = 2;
+                fastBytes = 128;
+                break;
+
+
+
+        }
+    }
+
 }
 
 #endif //POCKETLZMA_SETTINGS_HPP
