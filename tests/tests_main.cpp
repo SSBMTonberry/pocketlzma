@@ -93,7 +93,7 @@ TEST_CASE( "Decompress lzma-json with missing size header - expect missing heade
     std::vector<uint8_t> output;
     plz::StatusCode status = p.decompress(input, output);
 
-    REQUIRE(status == plz::StatusCode::MissingSizeInfoInHeader);
+    REQUIRE(status == plz::StatusCode::Ok);
 }
 
 TEST_CASE( "Compress json with compression presets BestCompression - Fast - expect smaller size and slower for highest compression", "[compression]" )

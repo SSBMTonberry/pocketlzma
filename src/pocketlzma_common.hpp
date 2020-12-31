@@ -19,6 +19,8 @@ namespace plz
     const uint16_t PLZ_MIN_FAST_BYTES {5};
     const uint16_t PLZ_MAX_FAST_BYTES {273};
 
+    const uint32_t PLZ_BUFFER_SIZE {1 << 16}; //65536 bytes
+
     enum class StatusCode
     {
 
