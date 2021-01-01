@@ -127,10 +127,9 @@ option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 #         src/common/LzmaOptimal.hpp src/common/Price.hpp src/misc/MemoryBuffer.hpp src/misc/MemoryStream.hpp
 #         src/misc/File.hpp src/common/Fastpos.hpp src/common/LzOptions.hpp src/pocketlzma_class.hpp src/Settings.hpp src/pocketlzma_common.hpp)
 
- set(SOURCE_FILES src_old/main.cpp src/pocketlzma_common.hpp src/pocketlzma.h src/misc/MemoryBuffer.hpp src/misc/MemoryStream.hpp
-         src/misc/File.hpp src/pocketlzma_class.hpp src/Settings.hpp src/misc/FileStatus.hpp doc/experiment.cpp)
+ set(SOURCE_FILES pocketlzma_program.cpp)
 
 # Only activated for code completion, must be uncommented before release!
-add_library(pocketlzma ${SOURCE_FILES} ${LZMA_SOURCE_FILES}) #dummy build
+# add_library(pocketlzma ${SOURCE_FILES} ${LZMA_SOURCE_FILES}) #dummy build
 
 add_subdirectory(tests)

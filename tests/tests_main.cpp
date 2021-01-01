@@ -17,22 +17,6 @@
 /*! short namespace alias */
 namespace memfiles = pocketlzma_memory_files_mapper;
 
-TEST_CASE("Dummy", "[dumdum]")
-{
-    unsigned char * dest;
-    size_t destLen = 0;
-    unsigned char * src;
-    size_t srcLen = 0;
-    unsigned char * props;
-    size_t propsSize = 0;
-    plz::c::LzmaCompress(dest, &destLen, src, srcLen, props, &propsSize, 5, (1 << 7), 5,5,4,3,2);
-
-    plz::StatusCode code;
-    plz::PocketLzma lzma;
-
-
-}
-
 TEST_CASE( "Compress a ridiculously small byte buffer - pray that it works", "[compression]" )
 {
 
@@ -102,7 +86,6 @@ TEST_CASE( "Decompress lzma-json with missing size header - expect missing heade
 
 TEST_CASE( "Decompress two files from memory - expect success", "[decompression]" )
 {
-    std::string path = "./../../content/to_compress/from/json_test.json";
     std::vector<uint8_t> input1 = plz::File::FromMemory(memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA, memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA_SIZE);
     std::vector<uint8_t> input2 = plz::File::FromMemory(memfiles::_JSON_TEST_OK_HEADER_LZMA, memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE);
     plz::PocketLzma p;
@@ -126,6 +109,48 @@ TEST_CASE( "Decompress two files from memory - expect success", "[decompression]
 
     std::cout << "unknown size mem file time: " << ms1.count() << "ms - Size (bytes): " << input1.size() << "->" << output1.size() << "\n\n";
     std::cout << "OK mem file time:           " << ms2.count() << "ms - Size (bytes): " << input2.size() << "->" << output2.size() << "\n";
+
+    REQUIRE(output1.size() == output2.size());
+}
+
+TEST_CASE( "Decompress buffered from memory - expect success", "[decompression]" )
+{
+    std::vector<uint8_t> input = plz::File::FromMemory(memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA, memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA_SIZE);
+    plz::PocketLzma p;
+
+    std::vector<uint8_t> output2;
+
+    plz::StatusCode status = p.decompressBuffered(input, output2);
+    plz::StatusCode status2 = p.decompressBuffered(memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA, memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA_SIZE, output2);
+    REQUIRE(status == plz::StatusCode::Ok);
+    REQUIRE(status2 == plz::StatusCode::Ok);
+}
+
+TEST_CASE( "Decompress two files from memory using alternative function - expect success", "[decompression]" )
+{
+    plz::PocketLzma p;
+
+    std::vector<uint8_t> output1;
+    std::vector<uint8_t> output2;
+
+    auto start1 = std::chrono::steady_clock::now();
+    plz::StatusCode status = p.decompress(memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA, memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA_SIZE, output1);
+    auto end1 = std::chrono::steady_clock::now();
+    std::chrono::duration<double> ms1 = (end1-start1) * 1000;
+
+    REQUIRE(status == plz::StatusCode::Ok);
+
+    auto start2 = std::chrono::steady_clock::now();
+    plz::StatusCode status2 = p.decompress(memfiles::_JSON_TEST_OK_HEADER_LZMA, memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE, output2);
+    auto end2 = std::chrono::steady_clock::now();
+    std::chrono::duration<double> ms2 = (end2-start2) * 1000;
+
+    REQUIRE(status2 == plz::StatusCode::Ok);
+
+    std::cout << "unknown size mem file time: " << ms1.count() << "ms - Size (bytes): " << memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA_SIZE << "->" << output1.size() << "\n\n";
+    std::cout << "OK mem file time:           " << ms2.count() << "ms - Size (bytes): " << memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE << "->" << output2.size() << "\n";
+
+    REQUIRE(output1.size() == output2.size());
 }
 
 TEST_CASE( "Compress json with compression presets BestCompression - Fast - expect smaller size and slower for highest compression", "[compression]" )
@@ -224,7 +249,7 @@ TEST_CASE( "Compress json with compression presets Fast - Fastest - expect small
     std::cout << "Fast time:               " << ms1.count() << "ms - Size (bytes): " << input.size() << "->" << output.size() << "\n\n";
 
     REQUIRE(output.size() < outputFast.size());
-    REQUIRE(ms2 < ms1);
+    //REQUIRE(ms2 < ms1); //Speeddifference is so small that "Fast" in a few rare cases can be quicker than "Fastest"
 }
 
 TEST_CASE( "Compress json with compression presets GoodCompression - BestCompression - expect smaller size and slower for highest compression", "[compression]" )
