@@ -8,6 +8,10 @@
 #include <cstdint>
 #include <memory>
 
+#include <cstdio>
+#include <cstdlib>
+#include <string.h>
+
 namespace plz
 {
     const uint8_t PLZ_MAX_LEVEL {9};

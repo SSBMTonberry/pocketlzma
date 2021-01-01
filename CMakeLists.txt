@@ -131,5 +131,6 @@ option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 
 # Only activated for code completion, must be uncommented before release!
 # add_library(pocketlzma ${SOURCE_FILES} ${LZMA_SOURCE_FILES}) #dummy build
+add_executable(pocketlzma ${SOURCE_FILES})
 
 add_subdirectory(tests)
