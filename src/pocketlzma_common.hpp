@@ -20,6 +20,7 @@ namespace plz
     const uint16_t PLZ_MAX_FAST_BYTES {273};
 
     const uint32_t PLZ_BUFFER_SIZE {1 << 16}; //65536 bytes
+    const uint8_t PLZ_MINIMUM_LZMA_SIZE {12};
 
     enum class StatusCode
     {
@@ -40,11 +41,10 @@ namespace plz
         ErrorArchive = SZ_ERROR_ARCHIVE, //16
         ErrorNoArchive = SZ_ERROR_NO_ARCHIVE, //17
 
-        /*!
-         * When attempting to decompress, but size info is missing in header.
-         */
-        MissingSizeInfoInHeader = 100,
+        /*! When you attempt to decompress something that cannot be LZMA data */
+        InvalidLzmaData = 100,
 
+        /*! If you get this, you probably have attempted to decompress corrupted/garbage LZMA data */
         UndefinedError = 999
     };
 

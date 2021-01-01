@@ -53,6 +53,56 @@ TEST_CASE( "Compress json with default settings - expect smaller compressed size
 
 }
 
+TEST_CASE( "Decompress too short data - expect InvalidLzmaData error", "[compression]" )
+{
+    std::vector<uint8_t> input {34, 32, 156, 4, 4, 4, 9, 78, 192, 82, 33, 91};
+
+    plz::PocketLzma p;
+
+    std::vector<uint8_t> output;
+    plz::StatusCode status = p.decompress(input, output);
+
+    REQUIRE(status == plz::StatusCode::InvalidLzmaData);
+}
+
+/*!
+ * Removed due to no nice way to resolve corrupted data crashes...
+ */
+// TEST_CASE( "Decompress random invalid data - expect UndefinedError", "[compression]" )
+// {
+//     std::vector<uint8_t> input
+//     {
+//         34, 32, 156, 4, 4, 4, 9, 78, 192, 82, 33, 91, 34, 32,
+//         156, 4, 4, 4, 9, 78, 192, 82, 33, 91, 34, 32,
+//         156, 4, 4, 4, 9, 78, 192, 82, 33, 91
+//     };
+//
+//     plz::PocketLzma p;
+//
+//     std::vector<uint8_t> output;
+//     plz::StatusCode status = p.decompress(input, output);
+//
+//     REQUIRE(status == plz::StatusCode::UndefinedError);
+// }
+//
+// TEST_CASE( "Decompress random invalid data buffered - expect UndefinedError", "[compression]" )
+// {
+//     std::vector<uint8_t> input
+//             {
+//                     34, 32, 156, 4, 4, 4, 9, 78, 192, 82, 33, 91, 34, 32,
+//                     156, 4, 4, 4, 9, 78, 192, 82, 33, 91, 34, 32,
+//                     156, 4, 4, 4, 9, 78, 192, 82, 33, 91
+//             };
+//
+//     plz::PocketLzma p;
+//
+//     std::vector<uint8_t> output;
+//     plz::StatusCode status = p.decompress(input, output);
+//
+//     REQUIRE(status != plz::StatusCode::Ok);
+// }
+
+
 TEST_CASE( "Decompress lzma-json  - expect larger size and success", "[compression]" )
 {
     //std::string path = "./../../content/to_decompress/from/json_test.json.lzma";
