@@ -368,6 +368,39 @@ TEST_CASE( "Compress json with compression presets Default - GoodCompression - e
     REQUIRE(ms2 < ms1);
 }
 
+TEST_CASE( "Compress and Decompress a Slippi replay with compression preset GoodCompression - print compression time and expect smaller size ", "[compression]" )
+{
+    std::string path = "./../../content/to_compress/from/slippi_replay.slp";
+    std::vector<uint8_t> input = plz::File::FromFile(path);
+
+    plz::PocketLzma p;
+
+    std::vector<uint8_t> output;
+    std::vector<uint8_t> outputDecomp;
+
+    p.usePreset(plz::Preset::GoodCompression);
+    auto start1 = std::chrono::steady_clock::now();
+    plz::StatusCode status = p.compress(input, output);
+    auto end1 = std::chrono::steady_clock::now();
+    std::chrono::duration<double> ms1 = (end1-start1) * 1000;
+
+    REQUIRE(status == plz::StatusCode::Ok);
+
+    auto start2 = std::chrono::steady_clock::now();
+    plz::StatusCode status2 = p.decompress(output, outputDecomp);
+    auto end2 = std::chrono::steady_clock::now();
+    std::chrono::duration<double> ms2 = (end2-start2) * 1000;
+
+    REQUIRE(status2 == plz::StatusCode::Ok);
+
+    std::cout << "Slippi replay test: \n";
+    std::cout << "Compression time:          " << ms1.count() << "ms - Size (bytes): " << input.size() << "->" << output.size() << "\n";
+    std::cout << "Decompression time:        " << ms2.count() << "ms - Size (bytes): " << output.size() << "->" << outputDecomp.size() << "\n";
+
+    REQUIRE(output.size() < outputDecomp.size());
+    REQUIRE(ms2 < ms1);
+}
+
 TEST_CASE( "BENCHMARK - Compress and decompress json with all compression presets - calculate average", "[compression]" )
 {
     std::string path = "./../../content/to_compress/from/json_test.json";
