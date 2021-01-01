@@ -12,6 +12,10 @@
 #include <memory>
 #include <map>
 #include <functional>
+#include "../content/memoryGen/pocketlzma_memory_files_mapper.h"
+
+/*! short namespace alias */
+namespace memfiles = pocketlzma_memory_files_mapper;
 
 TEST_CASE("Dummy", "[dumdum]")
 {
@@ -94,6 +98,34 @@ TEST_CASE( "Decompress lzma-json with missing size header - expect missing heade
     plz::StatusCode status = p.decompress(input, output);
 
     REQUIRE(status == plz::StatusCode::Ok);
+}
+
+TEST_CASE( "Decompress two files from memory - expect success", "[decompression]" )
+{
+    std::string path = "./../../content/to_compress/from/json_test.json";
+    std::vector<uint8_t> input1 = plz::File::FromMemory(memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA, memfiles::_JSON_TEST_UNKNOWN_SIZE_LZMA_SIZE);
+    std::vector<uint8_t> input2 = plz::File::FromMemory(memfiles::_JSON_TEST_OK_HEADER_LZMA, memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE);
+    plz::PocketLzma p;
+
+    std::vector<uint8_t> output1;
+    std::vector<uint8_t> output2;
+
+    auto start1 = std::chrono::steady_clock::now();
+    plz::StatusCode status = p.decompress(input1, output1);
+    auto end1 = std::chrono::steady_clock::now();
+    std::chrono::duration<double> ms1 = (end1-start1) * 1000;
+
+    REQUIRE(status == plz::StatusCode::Ok);
+
+    auto start2 = std::chrono::steady_clock::now();
+    plz::StatusCode status2 = p.decompress(input2, output2);
+    auto end2 = std::chrono::steady_clock::now();
+    std::chrono::duration<double> ms2 = (end2-start2) * 1000;
+
+    REQUIRE(status2 == plz::StatusCode::Ok);
+
+    std::cout << "unknown size mem file time: " << ms1.count() << "ms - Size (bytes): " << input1.size() << "->" << output1.size() << "\n\n";
+    std::cout << "OK mem file time:           " << ms2.count() << "ms - Size (bytes): " << input2.size() << "->" << output2.size() << "\n";
 }
 
 TEST_CASE( "Compress json with compression presets BestCompression - Fast - expect smaller size and slower for highest compression", "[compression]" )
