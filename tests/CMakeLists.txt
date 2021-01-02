@@ -5,23 +5,13 @@ set(CMAKE_CXX_STANDARD 11)
 
 include_directories(${PROJECT_SOURCE_DIR}/../external_libs/ ${PROJECT_SOURCE_DIR}/../src)
 
+option(RUN_BENCHMARK_TESTS "Run benchmark tests" OFF)
+
+configure_file (
+        "${PROJECT_SOURCE_DIR}/PocketLzmaTestsConfig.h.in"
+        "${PROJECT_SOURCE_DIR}/PocketLzmaTestsConfig.h"
+)
+
 add_executable(pocketlzma_tests tests_main.cpp tests_file.cpp)
-#target_link_libraries(pocketlzma_tests pocketlzma)
-#if(LINUX)
-#    message("LINUX!")
-#    target_link_libraries(pocketlzma_tests stdc++fs)
-#    #target_link_libraries(pocketlzma_tests tileson stdc++fs)
-#elseif(APPLE)
-#    message("OSX!")
-#    if(${USE_CPP17_FILESYSTEM})
-#        message("Using filesystem for tests!")
-#        target_link_libraries(pocketlzma_tests /usr/local/opt/llvm/lib/libc++experimental.a /usr/local/opt/llvm/lib/libc++fs.a)
-#        #target_link_libraries(pocketlzma_tests tileson /usr/local/opt/llvm/lib/libc++experimental.a /usr/local/opt/llvm/lib/libc++fs.a)
-#    else()
-#        message("Filesystem disabled. Using std::string for paths!")
-#        #target_link_libraries(pocketlzma_tests tileson)
-#    endif()
-#elseif(WINDOWS)
-#    message("WINDOWS!")
-#    #target_link_libraries(pocketlzma_tests tileson)
-#endif()
+
+unset(RUN_BENCHMARK_TESTS CACHE)

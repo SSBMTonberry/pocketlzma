@@ -1,6 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include "../external_libs/catch.hpp"
 
+#include "PocketLzmaTestsConfig.h"
 //#define POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
 
 #ifdef POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
@@ -401,428 +402,430 @@ TEST_CASE( "Compress and Decompress a Slippi replay with compression preset Good
     REQUIRE(ms2 < ms1);
 }
 
-TEST_CASE( "BENCHMARK json - Compress and decompress json with all compression presets - calculate average", "[compression]" )
-{
-    std::string path = "./../../content/to_compress/from/json_test.json";
-    std::vector<uint8_t> input = plz::File::FromFile(path);
-
-    plz::PocketLzma p;
-
-    const int NUM_OF_RUNS = 20;
-
-    std::vector<uint8_t> outputFastest;
-    std::vector<uint8_t> outputFast;
-    std::vector<uint8_t> outputDefault;
-    std::vector<uint8_t> outputGood;
-    std::vector<uint8_t> outputBest;
-
-    std::vector<double> timeFastest;
-    std::vector<double> timeFast;
-    std::vector<double> timeDefault;
-    std::vector<double> timeGood;
-    std::vector<double> timeBest;
-
-    auto testStart = std::chrono::steady_clock::now();
-    for(int i = 0; i < NUM_OF_RUNS; ++i)
+#ifdef RUN_BENCHMARK_TESTS
+    TEST_CASE( "BENCHMARK json - Compress and decompress json with all compression presets - calculate average", "[compression]" )
     {
-        std::vector<uint8_t> output;
+        std::string path = "./../../content/to_compress/from/json_test.json";
+        std::vector<uint8_t> input = plz::File::FromFile(path);
 
-        //Fastest
-        p.usePreset(plz::Preset::Fastest);
-        auto startFastest = std::chrono::steady_clock::now();
-        plz::StatusCode status = p.compress(input, output);
-        auto endFastest = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msFastest = (endFastest-startFastest) * 1000;
-        if(i == 0)
-            outputFastest = output;
-        timeFastest.push_back(msFastest.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        plz::PocketLzma p;
 
-        //Fast
-        p.usePreset(plz::Preset::Fast);
-        auto startFast = std::chrono::steady_clock::now();
-        status = p.compress(input, output);
-        auto endFast = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msFast = (endFast-startFast) * 1000;
-        if(i == 0)
-            outputFast = output;
-        timeFast.push_back(msFast.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        const int NUM_OF_RUNS = 20;
 
-        //Default
-        p.usePreset(plz::Preset::Default);
-        auto startDefault = std::chrono::steady_clock::now();
-        status = p.compress(input, output);
-        auto endDefault = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msDefault = (endDefault-startDefault) * 1000;
-        if(i == 0)
-            outputDefault = output;
-        timeDefault.push_back(msDefault.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        std::vector<uint8_t> outputFastest;
+        std::vector<uint8_t> outputFast;
+        std::vector<uint8_t> outputDefault;
+        std::vector<uint8_t> outputGood;
+        std::vector<uint8_t> outputBest;
 
-        //Good
-        p.usePreset(plz::Preset::GoodCompression);
-        auto startGood = std::chrono::steady_clock::now();
-        status = p.compress(input, output);
-        auto endGood = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msGood = (endGood-startGood) * 1000;
-        if(i == 0)
-            outputGood = output;
-        timeGood.push_back(msGood.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        std::vector<double> timeFastest;
+        std::vector<double> timeFast;
+        std::vector<double> timeDefault;
+        std::vector<double> timeGood;
+        std::vector<double> timeBest;
 
-        //Best
-        p.usePreset(plz::Preset::BestCompression);
-        auto startBest = std::chrono::steady_clock::now();
-        status = p.compress(input, output);
-        auto endBest = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msBest = (endBest-startBest) * 1000;
-        if(i == 0)
-            outputBest = output;
-        timeBest.push_back(msBest.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        auto testStart = std::chrono::steady_clock::now();
+        for(int i = 0; i < NUM_OF_RUNS; ++i)
+        {
+            std::vector<uint8_t> output;
+
+            //Fastest
+            p.usePreset(plz::Preset::Fastest);
+            auto startFastest = std::chrono::steady_clock::now();
+            plz::StatusCode status = p.compress(input, output);
+            auto endFastest = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msFastest = (endFastest-startFastest) * 1000;
+            if(i == 0)
+                outputFastest = output;
+            timeFastest.push_back(msFastest.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Fast
+            p.usePreset(plz::Preset::Fast);
+            auto startFast = std::chrono::steady_clock::now();
+            status = p.compress(input, output);
+            auto endFast = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msFast = (endFast-startFast) * 1000;
+            if(i == 0)
+                outputFast = output;
+            timeFast.push_back(msFast.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Default
+            p.usePreset(plz::Preset::Default);
+            auto startDefault = std::chrono::steady_clock::now();
+            status = p.compress(input, output);
+            auto endDefault = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msDefault = (endDefault-startDefault) * 1000;
+            if(i == 0)
+                outputDefault = output;
+            timeDefault.push_back(msDefault.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Good
+            p.usePreset(plz::Preset::GoodCompression);
+            auto startGood = std::chrono::steady_clock::now();
+            status = p.compress(input, output);
+            auto endGood = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msGood = (endGood-startGood) * 1000;
+            if(i == 0)
+                outputGood = output;
+            timeGood.push_back(msGood.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Best
+            p.usePreset(plz::Preset::BestCompression);
+            auto startBest = std::chrono::steady_clock::now();
+            status = p.compress(input, output);
+            auto endBest = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msBest = (endBest-startBest) * 1000;
+            if(i == 0)
+                outputBest = output;
+            timeBest.push_back(msBest.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+        }
+        auto testStop = std::chrono::steady_clock::now();
+        std::chrono::duration<double> msTest = (testStop-testStart) * 1000;
+
+        double fastestMin = std::min_element(timeFastest.begin(), timeFastest.end()).operator*();
+        double fastestAvg = std::accumulate(timeFastest.begin(), timeFastest.end(), 0.0) / timeFastest.size();
+        double fastestMax = std::max_element(timeFastest.begin(), timeFastest.end()).operator*();
+        double fastMin = std::min_element(timeFast.begin(), timeFast.end()).operator*();
+        double fastAvg = std::accumulate(timeFast.begin(), timeFast.end(), 0.0) / timeFast.size();
+        double fastMax = std::max_element(timeFast.begin(), timeFast.end()).operator*();
+        double defaultMin = std::min_element(timeDefault.begin(), timeDefault.end()).operator*();
+        double defaultAvg = std::accumulate(timeDefault.begin(), timeDefault.end(), 0.0) / timeDefault.size();
+        double defaultMax = std::max_element(timeDefault.begin(), timeDefault.end()).operator*();
+        double goodMin = std::min_element(timeGood.begin(), timeGood.end()).operator*();
+        double goodAvg = std::accumulate(timeGood.begin(), timeGood.end(), 0.0) / timeGood.size();
+        double goodMax = std::max_element(timeGood.begin(), timeGood.end()).operator*();
+        double bestMin = std::min_element(timeBest.begin(), timeBest.end()).operator*();
+        double bestAvg = std::accumulate(timeBest.begin(), timeBest.end(), 0.0) / timeBest.size();
+        double bestMax = std::max_element(timeBest.begin(), timeBest.end()).operator*();
+
+        std::cout << "// C O M P R E S S I O N ( J S O N )  B E N C H M A R K  \n";
+        std::cout << "// -------------------------------------------\n\n";
+        std::cout << "Number of runs: " << NUM_OF_RUNS << "\n";
+        std::cout << "Total time: " << msTest.count() << "ms\n\n";
+        std::cout << "Fastest - time: average=" << fastestAvg << "ms min=" << fastestMin << "ms max=" << fastestMax <<
+                                                 "ms - Size (bytes): " << input.size() << "->" << outputFastest.size() << "\n";
+        std::cout << "Fast - time: average=" << fastAvg << "ms min=" << fastMin << "ms max=" << fastMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputFast.size() << "\n";
+        std::cout << "Default - time: average=" << defaultAvg << "ms min=" << defaultMin << "ms max=" << defaultMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputDefault.size() << "\n";
+        std::cout << "Good - time: average=" << goodAvg << "ms min=" << goodMin << "ms max=" << goodMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputGood.size() << "\n";
+        std::cout << "Best - time: average=" << bestAvg << "ms min=" << bestMin << "ms max=" << bestMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputBest.size() << "\n";
+
+        std::cout << std::endl;
+
+        //Decompression
+        std::vector<double> timeDecompFastest;
+        std::vector<double> timeDecompFast;
+        std::vector<double> timeDecompDefault;
+        std::vector<double> timeDecompGood;
+        std::vector<double> timeDecompBest;
+
+        auto testDecompStart = std::chrono::steady_clock::now();
+        for(int i = 0; i < NUM_OF_RUNS; ++i)
+        {
+            std::vector<uint8_t> output;
+
+            //Fastest
+            auto startFastest = std::chrono::steady_clock::now();
+            plz::StatusCode status = p.decompress(outputFastest, output);
+            auto endFastest = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msFastest = (endFastest-startFastest) * 1000;
+            timeDecompFastest.push_back(msFastest.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Fast
+            auto startFast = std::chrono::steady_clock::now();
+            status = p.decompress(outputFast, output);
+            auto endFast = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msFast = (endFast-startFast) * 1000;
+            timeDecompFast.push_back(msFast.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Default
+            auto startDefault = std::chrono::steady_clock::now();
+            status = p.decompress(outputDefault, output);
+            auto endDefault = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msDefault = (endDefault-startDefault) * 1000;
+            timeDecompDefault.push_back(msDefault.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Good
+            auto startGood = std::chrono::steady_clock::now();
+            status = p.decompress(outputGood, output);
+            auto endGood = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msGood = (endGood-startGood) * 1000;
+            timeDecompGood.push_back(msGood.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Best
+            auto startBest = std::chrono::steady_clock::now();
+            status = p.decompress(outputBest, output);
+            auto endBest = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msBest = (endBest-startBest) * 1000;
+            timeDecompBest.push_back(msBest.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+        }
+        auto testDecompStop = std::chrono::steady_clock::now();
+        std::chrono::duration<double> msDecompTest = (testDecompStop-testDecompStart) * 1000;
+
+        double fastestDecompMin = std::min_element(timeDecompFastest.begin(), timeDecompFastest.end()).operator*();
+        double fastestDecompAvg = std::accumulate(timeDecompFastest.begin(), timeDecompFastest.end(), 0.0) / timeDecompFastest.size();
+        double fastestDecompMax = std::max_element(timeDecompFastest.begin(), timeDecompFastest.end()).operator*();
+        double fastDecompMin = std::min_element(timeDecompFast.begin(), timeDecompFast.end()).operator*();
+        double fastDecompAvg = std::accumulate(timeDecompFast.begin(), timeDecompFast.end(), 0.0) / timeDecompFast.size();
+        double fastDecompMax = std::max_element(timeDecompFast.begin(), timeDecompFast.end()).operator*();
+        double defaultDecompMin = std::min_element(timeDecompDefault.begin(), timeDecompDefault.end()).operator*();
+        double defaultDecompAvg = std::accumulate(timeDecompDefault.begin(), timeDecompDefault.end(), 0.0) / timeDecompDefault.size();
+        double defaultDecompMax = std::max_element(timeDecompDefault.begin(), timeDecompDefault.end()).operator*();
+        double goodDecompMin = std::min_element(timeDecompGood.begin(), timeDecompGood.end()).operator*();
+        double goodDecompAvg = std::accumulate(timeDecompGood.begin(), timeDecompGood.end(), 0.0) / timeDecompGood.size();
+        double goodDecompMax = std::max_element(timeDecompGood.begin(), timeDecompGood.end()).operator*();
+        double bestDecompMin = std::min_element(timeDecompBest.begin(), timeDecompBest.end()).operator*();
+        double bestDecompAvg = std::accumulate(timeDecompBest.begin(), timeDecompBest.end(), 0.0) / timeDecompBest.size();
+        double bestDecompMax = std::max_element(timeDecompBest.begin(), timeDecompBest.end()).operator*();
+
+        std::cout << "// D E C O M P R E S S I O N ( J S O N )   B E N C H M A R K  \n";
+        std::cout << "// -----------------------------------------------\n\n";
+        std::cout << "Number of runs: " << NUM_OF_RUNS << "\n";
+        std::cout << "Total time: " << msDecompTest.count() << "ms\n\n";
+        std::cout << "Fastest - time: average=" << fastestDecompAvg << "ms min=" << fastestDecompMin << "ms max=" << fastestDecompMax << "ms\n";
+        std::cout << "Fast - time: average=" << fastDecompAvg << "ms min=" << fastDecompMin << "ms max=" << fastDecompMax << "ms\n";
+        std::cout << "Default - time: average=" << defaultDecompAvg << "ms min=" << defaultDecompMin << "ms max=" << defaultDecompMax << "ms\n";
+        std::cout << "Good - time: average=" << goodDecompAvg << "ms min=" << goodDecompMin << "ms max=" << goodDecompMax << "ms\n";
+        std::cout << "Best - time: average=" << bestDecompAvg << "ms min=" << bestDecompMin << "ms max=" << bestDecompMax << "ms\n";
+
+        std::cout << std::endl;
+
+        REQUIRE(true);
     }
-    auto testStop = std::chrono::steady_clock::now();
-    std::chrono::duration<double> msTest = (testStop-testStart) * 1000;
 
-    double fastestMin = std::min_element(timeFastest.begin(), timeFastest.end()).operator*();
-    double fastestAvg = std::accumulate(timeFastest.begin(), timeFastest.end(), 0.0) / timeFastest.size();
-    double fastestMax = std::max_element(timeFastest.begin(), timeFastest.end()).operator*();
-    double fastMin = std::min_element(timeFast.begin(), timeFast.end()).operator*();
-    double fastAvg = std::accumulate(timeFast.begin(), timeFast.end(), 0.0) / timeFast.size();
-    double fastMax = std::max_element(timeFast.begin(), timeFast.end()).operator*();
-    double defaultMin = std::min_element(timeDefault.begin(), timeDefault.end()).operator*();
-    double defaultAvg = std::accumulate(timeDefault.begin(), timeDefault.end(), 0.0) / timeDefault.size();
-    double defaultMax = std::max_element(timeDefault.begin(), timeDefault.end()).operator*();
-    double goodMin = std::min_element(timeGood.begin(), timeGood.end()).operator*();
-    double goodAvg = std::accumulate(timeGood.begin(), timeGood.end(), 0.0) / timeGood.size();
-    double goodMax = std::max_element(timeGood.begin(), timeGood.end()).operator*();
-    double bestMin = std::min_element(timeBest.begin(), timeBest.end()).operator*();
-    double bestAvg = std::accumulate(timeBest.begin(), timeBest.end(), 0.0) / timeBest.size();
-    double bestMax = std::max_element(timeBest.begin(), timeBest.end()).operator*();
-
-    std::cout << "// C O M P R E S S I O N ( J S O N )  B E N C H M A R K  \n";
-    std::cout << "// -------------------------------------------\n\n";
-    std::cout << "Number of runs: " << NUM_OF_RUNS << "\n";
-    std::cout << "Total time: " << msTest.count() << "ms\n\n";
-    std::cout << "Fastest - time: average=" << fastestAvg << "ms min=" << fastestMin << "ms max=" << fastestMax <<
-                                             "ms - Size (bytes): " << input.size() << "->" << outputFastest.size() << "\n";
-    std::cout << "Fast - time: average=" << fastAvg << "ms min=" << fastMin << "ms max=" << fastMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputFast.size() << "\n";
-    std::cout << "Default - time: average=" << defaultAvg << "ms min=" << defaultMin << "ms max=" << defaultMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputDefault.size() << "\n";
-    std::cout << "Good - time: average=" << goodAvg << "ms min=" << goodMin << "ms max=" << goodMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputGood.size() << "\n";
-    std::cout << "Best - time: average=" << bestAvg << "ms min=" << bestMin << "ms max=" << bestMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputBest.size() << "\n";
-
-    std::cout << std::endl;
-
-    //Decompression
-    std::vector<double> timeDecompFastest;
-    std::vector<double> timeDecompFast;
-    std::vector<double> timeDecompDefault;
-    std::vector<double> timeDecompGood;
-    std::vector<double> timeDecompBest;
-
-    auto testDecompStart = std::chrono::steady_clock::now();
-    for(int i = 0; i < NUM_OF_RUNS; ++i)
+    TEST_CASE( "BENCHMARK 4MB .slp binary file - Compress and decompress .slp with all compression presets - calculate average", "[compression]" )
     {
-        std::vector<uint8_t> output;
+        std::string path = "./../../content/to_compress/from/slippi_replay.slp";
+        std::vector<uint8_t> input = plz::File::FromFile(path);
 
-        //Fastest
-        auto startFastest = std::chrono::steady_clock::now();
-        plz::StatusCode status = p.decompress(outputFastest, output);
-        auto endFastest = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msFastest = (endFastest-startFastest) * 1000;
-        timeDecompFastest.push_back(msFastest.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        plz::PocketLzma p;
 
-        //Fast
-        auto startFast = std::chrono::steady_clock::now();
-        status = p.decompress(outputFast, output);
-        auto endFast = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msFast = (endFast-startFast) * 1000;
-        timeDecompFast.push_back(msFast.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        const int NUM_OF_RUNS = 5;
 
-        //Default
-        auto startDefault = std::chrono::steady_clock::now();
-        status = p.decompress(outputDefault, output);
-        auto endDefault = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msDefault = (endDefault-startDefault) * 1000;
-        timeDecompDefault.push_back(msDefault.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        std::vector<uint8_t> outputFastest;
+        std::vector<uint8_t> outputFast;
+        std::vector<uint8_t> outputDefault;
+        std::vector<uint8_t> outputGood;
+        std::vector<uint8_t> outputBest;
 
-        //Good
-        auto startGood = std::chrono::steady_clock::now();
-        status = p.decompress(outputGood, output);
-        auto endGood = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msGood = (endGood-startGood) * 1000;
-        timeDecompGood.push_back(msGood.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        std::vector<double> timeFastest;
+        std::vector<double> timeFast;
+        std::vector<double> timeDefault;
+        std::vector<double> timeGood;
+        std::vector<double> timeBest;
 
-        //Best
-        auto startBest = std::chrono::steady_clock::now();
-        status = p.decompress(outputBest, output);
-        auto endBest = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msBest = (endBest-startBest) * 1000;
-        timeDecompBest.push_back(msBest.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
+        auto testStart = std::chrono::steady_clock::now();
+        for(int i = 0; i < NUM_OF_RUNS; ++i)
+        {
+            std::vector<uint8_t> output;
+
+            //Fastest
+            p.usePreset(plz::Preset::Fastest);
+            auto startFastest = std::chrono::steady_clock::now();
+            plz::StatusCode status = p.compress(input, output);
+            auto endFastest = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msFastest = (endFastest-startFastest) * 1000;
+            if(i == 0)
+                outputFastest = output;
+            timeFastest.push_back(msFastest.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Fast
+            p.usePreset(plz::Preset::Fast);
+            auto startFast = std::chrono::steady_clock::now();
+            status = p.compress(input, output);
+            auto endFast = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msFast = (endFast-startFast) * 1000;
+            if(i == 0)
+                outputFast = output;
+            timeFast.push_back(msFast.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Default
+            p.usePreset(plz::Preset::Default);
+            auto startDefault = std::chrono::steady_clock::now();
+            status = p.compress(input, output);
+            auto endDefault = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msDefault = (endDefault-startDefault) * 1000;
+            if(i == 0)
+                outputDefault = output;
+            timeDefault.push_back(msDefault.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Good
+            p.usePreset(plz::Preset::GoodCompression);
+            auto startGood = std::chrono::steady_clock::now();
+            status = p.compress(input, output);
+            auto endGood = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msGood = (endGood-startGood) * 1000;
+            if(i == 0)
+                outputGood = output;
+            timeGood.push_back(msGood.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Best
+            p.usePreset(plz::Preset::BestCompression);
+            auto startBest = std::chrono::steady_clock::now();
+            status = p.compress(input, output);
+            auto endBest = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msBest = (endBest-startBest) * 1000;
+            if(i == 0)
+                outputBest = output;
+            timeBest.push_back(msBest.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+        }
+        auto testStop = std::chrono::steady_clock::now();
+        std::chrono::duration<double> msTest = (testStop-testStart) * 1000;
+
+        double fastestMin = std::min_element(timeFastest.begin(), timeFastest.end()).operator*();
+        double fastestAvg = std::accumulate(timeFastest.begin(), timeFastest.end(), 0.0) / timeFastest.size();
+        double fastestMax = std::max_element(timeFastest.begin(), timeFastest.end()).operator*();
+        double fastMin = std::min_element(timeFast.begin(), timeFast.end()).operator*();
+        double fastAvg = std::accumulate(timeFast.begin(), timeFast.end(), 0.0) / timeFast.size();
+        double fastMax = std::max_element(timeFast.begin(), timeFast.end()).operator*();
+        double defaultMin = std::min_element(timeDefault.begin(), timeDefault.end()).operator*();
+        double defaultAvg = std::accumulate(timeDefault.begin(), timeDefault.end(), 0.0) / timeDefault.size();
+        double defaultMax = std::max_element(timeDefault.begin(), timeDefault.end()).operator*();
+        double goodMin = std::min_element(timeGood.begin(), timeGood.end()).operator*();
+        double goodAvg = std::accumulate(timeGood.begin(), timeGood.end(), 0.0) / timeGood.size();
+        double goodMax = std::max_element(timeGood.begin(), timeGood.end()).operator*();
+        double bestMin = std::min_element(timeBest.begin(), timeBest.end()).operator*();
+        double bestAvg = std::accumulate(timeBest.begin(), timeBest.end(), 0.0) / timeBest.size();
+        double bestMax = std::max_element(timeBest.begin(), timeBest.end()).operator*();
+
+        std::cout << "// C O M P R E S S I O N ( . S L P )   B E N C H M A R K  \n";
+        std::cout << "// -------------------------------------------\n\n";
+        std::cout << "Number of runs: " << NUM_OF_RUNS << "\n";
+        std::cout << "Total time: " << msTest.count() << "ms\n\n";
+        std::cout << "Fastest - time: average=" << fastestAvg << "ms min=" << fastestMin << "ms max=" << fastestMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputFastest.size() << "\n";
+        std::cout << "Fast - time: average=" << fastAvg << "ms min=" << fastMin << "ms max=" << fastMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputFast.size() << "\n";
+        std::cout << "Default - time: average=" << defaultAvg << "ms min=" << defaultMin << "ms max=" << defaultMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputDefault.size() << "\n";
+        std::cout << "Good - time: average=" << goodAvg << "ms min=" << goodMin << "ms max=" << goodMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputGood.size() << "\n";
+        std::cout << "Best - time: average=" << bestAvg << "ms min=" << bestMin << "ms max=" << bestMax <<
+                  "ms - Size (bytes): " << input.size() << "->" << outputBest.size() << "\n";
+
+        std::cout << std::endl;
+
+        //Decompression
+        std::vector<double> timeDecompFastest;
+        std::vector<double> timeDecompFast;
+        std::vector<double> timeDecompDefault;
+        std::vector<double> timeDecompGood;
+        std::vector<double> timeDecompBest;
+
+        auto testDecompStart = std::chrono::steady_clock::now();
+        for(int i = 0; i < NUM_OF_RUNS; ++i)
+        {
+            std::vector<uint8_t> output;
+
+            //Fastest
+            auto startFastest = std::chrono::steady_clock::now();
+            plz::StatusCode status = p.decompress(outputFastest, output);
+            auto endFastest = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msFastest = (endFastest-startFastest) * 1000;
+            timeDecompFastest.push_back(msFastest.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Fast
+            auto startFast = std::chrono::steady_clock::now();
+            status = p.decompress(outputFast, output);
+            auto endFast = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msFast = (endFast-startFast) * 1000;
+            timeDecompFast.push_back(msFast.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Default
+            auto startDefault = std::chrono::steady_clock::now();
+            status = p.decompress(outputDefault, output);
+            auto endDefault = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msDefault = (endDefault-startDefault) * 1000;
+            timeDecompDefault.push_back(msDefault.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Good
+            auto startGood = std::chrono::steady_clock::now();
+            status = p.decompress(outputGood, output);
+            auto endGood = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msGood = (endGood-startGood) * 1000;
+            timeDecompGood.push_back(msGood.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+
+            //Best
+            auto startBest = std::chrono::steady_clock::now();
+            status = p.decompress(outputBest, output);
+            auto endBest = std::chrono::steady_clock::now();
+            std::chrono::duration<double> msBest = (endBest-startBest) * 1000;
+            timeDecompBest.push_back(msBest.count());
+            REQUIRE(status == plz::StatusCode::Ok);
+            output.clear();
+        }
+        auto testDecompStop = std::chrono::steady_clock::now();
+        std::chrono::duration<double> msDecompTest = (testDecompStop-testDecompStart) * 1000;
+
+        double fastestDecompMin = std::min_element(timeDecompFastest.begin(), timeDecompFastest.end()).operator*();
+        double fastestDecompAvg = std::accumulate(timeDecompFastest.begin(), timeDecompFastest.end(), 0.0) / timeDecompFastest.size();
+        double fastestDecompMax = std::max_element(timeDecompFastest.begin(), timeDecompFastest.end()).operator*();
+        double fastDecompMin = std::min_element(timeDecompFast.begin(), timeDecompFast.end()).operator*();
+        double fastDecompAvg = std::accumulate(timeDecompFast.begin(), timeDecompFast.end(), 0.0) / timeDecompFast.size();
+        double fastDecompMax = std::max_element(timeDecompFast.begin(), timeDecompFast.end()).operator*();
+        double defaultDecompMin = std::min_element(timeDecompDefault.begin(), timeDecompDefault.end()).operator*();
+        double defaultDecompAvg = std::accumulate(timeDecompDefault.begin(), timeDecompDefault.end(), 0.0) / timeDecompDefault.size();
+        double defaultDecompMax = std::max_element(timeDecompDefault.begin(), timeDecompDefault.end()).operator*();
+        double goodDecompMin = std::min_element(timeDecompGood.begin(), timeDecompGood.end()).operator*();
+        double goodDecompAvg = std::accumulate(timeDecompGood.begin(), timeDecompGood.end(), 0.0) / timeDecompGood.size();
+        double goodDecompMax = std::max_element(timeDecompGood.begin(), timeDecompGood.end()).operator*();
+        double bestDecompMin = std::min_element(timeDecompBest.begin(), timeDecompBest.end()).operator*();
+        double bestDecompAvg = std::accumulate(timeDecompBest.begin(), timeDecompBest.end(), 0.0) / timeDecompBest.size();
+        double bestDecompMax = std::max_element(timeDecompBest.begin(), timeDecompBest.end()).operator*();
+
+        std::cout << "// D E C O M P R E S S I O N ( . S L P )   B E N C H M A R K  \n";
+        std::cout << "// -----------------------------------------------\n\n";
+        std::cout << "Number of runs: " << NUM_OF_RUNS << "\n";
+        std::cout << "Total time: " << msDecompTest.count() << "ms\n\n";
+        std::cout << "Fastest - time: average=" << fastestDecompAvg << "ms min=" << fastestDecompMin << "ms max=" << fastestDecompMax << "ms\n";
+        std::cout << "Fast - time: average=" << fastDecompAvg << "ms min=" << fastDecompMin << "ms max=" << fastDecompMax << "ms\n";
+        std::cout << "Default - time: average=" << defaultDecompAvg << "ms min=" << defaultDecompMin << "ms max=" << defaultDecompMax << "ms\n";
+        std::cout << "Good - time: average=" << goodDecompAvg << "ms min=" << goodDecompMin << "ms max=" << goodDecompMax << "ms\n";
+        std::cout << "Best - time: average=" << bestDecompAvg << "ms min=" << bestDecompMin << "ms max=" << bestDecompMax << "ms\n";
+
+        std::cout << std::endl;
+
+        REQUIRE(true);
     }
-    auto testDecompStop = std::chrono::steady_clock::now();
-    std::chrono::duration<double> msDecompTest = (testDecompStop-testDecompStart) * 1000;
-
-    double fastestDecompMin = std::min_element(timeDecompFastest.begin(), timeDecompFastest.end()).operator*();
-    double fastestDecompAvg = std::accumulate(timeDecompFastest.begin(), timeDecompFastest.end(), 0.0) / timeDecompFastest.size();
-    double fastestDecompMax = std::max_element(timeDecompFastest.begin(), timeDecompFastest.end()).operator*();
-    double fastDecompMin = std::min_element(timeDecompFast.begin(), timeDecompFast.end()).operator*();
-    double fastDecompAvg = std::accumulate(timeDecompFast.begin(), timeDecompFast.end(), 0.0) / timeDecompFast.size();
-    double fastDecompMax = std::max_element(timeDecompFast.begin(), timeDecompFast.end()).operator*();
-    double defaultDecompMin = std::min_element(timeDecompDefault.begin(), timeDecompDefault.end()).operator*();
-    double defaultDecompAvg = std::accumulate(timeDecompDefault.begin(), timeDecompDefault.end(), 0.0) / timeDecompDefault.size();
-    double defaultDecompMax = std::max_element(timeDecompDefault.begin(), timeDecompDefault.end()).operator*();
-    double goodDecompMin = std::min_element(timeDecompGood.begin(), timeDecompGood.end()).operator*();
-    double goodDecompAvg = std::accumulate(timeDecompGood.begin(), timeDecompGood.end(), 0.0) / timeDecompGood.size();
-    double goodDecompMax = std::max_element(timeDecompGood.begin(), timeDecompGood.end()).operator*();
-    double bestDecompMin = std::min_element(timeDecompBest.begin(), timeDecompBest.end()).operator*();
-    double bestDecompAvg = std::accumulate(timeDecompBest.begin(), timeDecompBest.end(), 0.0) / timeDecompBest.size();
-    double bestDecompMax = std::max_element(timeDecompBest.begin(), timeDecompBest.end()).operator*();
-
-    std::cout << "// D E C O M P R E S S I O N ( J S O N )   B E N C H M A R K  \n";
-    std::cout << "// -----------------------------------------------\n\n";
-    std::cout << "Number of runs: " << NUM_OF_RUNS << "\n";
-    std::cout << "Total time: " << msDecompTest.count() << "ms\n\n";
-    std::cout << "Fastest - time: average=" << fastestDecompAvg << "ms min=" << fastestDecompMin << "ms max=" << fastestDecompMax << "ms\n";
-    std::cout << "Fast - time: average=" << fastDecompAvg << "ms min=" << fastDecompMin << "ms max=" << fastDecompMax << "ms\n";
-    std::cout << "Default - time: average=" << defaultDecompAvg << "ms min=" << defaultDecompMin << "ms max=" << defaultDecompMax << "ms\n";
-    std::cout << "Good - time: average=" << goodDecompAvg << "ms min=" << goodDecompMin << "ms max=" << goodDecompMax << "ms\n";
-    std::cout << "Best - time: average=" << bestDecompAvg << "ms min=" << bestDecompMin << "ms max=" << bestDecompMax << "ms\n";
-
-    std::cout << std::endl;
-
-    REQUIRE(true);
-}
-
-TEST_CASE( "BENCHMARK 4MB .slp binary file - Compress and decompress .slp with all compression presets - calculate average", "[compression]" )
-{
-    std::string path = "./../../content/to_compress/from/slippi_replay.slp";
-    std::vector<uint8_t> input = plz::File::FromFile(path);
-
-    plz::PocketLzma p;
-
-    const int NUM_OF_RUNS = 5;
-
-    std::vector<uint8_t> outputFastest;
-    std::vector<uint8_t> outputFast;
-    std::vector<uint8_t> outputDefault;
-    std::vector<uint8_t> outputGood;
-    std::vector<uint8_t> outputBest;
-
-    std::vector<double> timeFastest;
-    std::vector<double> timeFast;
-    std::vector<double> timeDefault;
-    std::vector<double> timeGood;
-    std::vector<double> timeBest;
-
-    auto testStart = std::chrono::steady_clock::now();
-    for(int i = 0; i < NUM_OF_RUNS; ++i)
-    {
-        std::vector<uint8_t> output;
-
-        //Fastest
-        p.usePreset(plz::Preset::Fastest);
-        auto startFastest = std::chrono::steady_clock::now();
-        plz::StatusCode status = p.compress(input, output);
-        auto endFastest = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msFastest = (endFastest-startFastest) * 1000;
-        if(i == 0)
-            outputFastest = output;
-        timeFastest.push_back(msFastest.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-
-        //Fast
-        p.usePreset(plz::Preset::Fast);
-        auto startFast = std::chrono::steady_clock::now();
-        status = p.compress(input, output);
-        auto endFast = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msFast = (endFast-startFast) * 1000;
-        if(i == 0)
-            outputFast = output;
-        timeFast.push_back(msFast.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-
-        //Default
-        p.usePreset(plz::Preset::Default);
-        auto startDefault = std::chrono::steady_clock::now();
-        status = p.compress(input, output);
-        auto endDefault = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msDefault = (endDefault-startDefault) * 1000;
-        if(i == 0)
-            outputDefault = output;
-        timeDefault.push_back(msDefault.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-
-        //Good
-        p.usePreset(plz::Preset::GoodCompression);
-        auto startGood = std::chrono::steady_clock::now();
-        status = p.compress(input, output);
-        auto endGood = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msGood = (endGood-startGood) * 1000;
-        if(i == 0)
-            outputGood = output;
-        timeGood.push_back(msGood.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-
-        //Best
-        p.usePreset(plz::Preset::BestCompression);
-        auto startBest = std::chrono::steady_clock::now();
-        status = p.compress(input, output);
-        auto endBest = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msBest = (endBest-startBest) * 1000;
-        if(i == 0)
-            outputBest = output;
-        timeBest.push_back(msBest.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-    }
-    auto testStop = std::chrono::steady_clock::now();
-    std::chrono::duration<double> msTest = (testStop-testStart) * 1000;
-
-    double fastestMin = std::min_element(timeFastest.begin(), timeFastest.end()).operator*();
-    double fastestAvg = std::accumulate(timeFastest.begin(), timeFastest.end(), 0.0) / timeFastest.size();
-    double fastestMax = std::max_element(timeFastest.begin(), timeFastest.end()).operator*();
-    double fastMin = std::min_element(timeFast.begin(), timeFast.end()).operator*();
-    double fastAvg = std::accumulate(timeFast.begin(), timeFast.end(), 0.0) / timeFast.size();
-    double fastMax = std::max_element(timeFast.begin(), timeFast.end()).operator*();
-    double defaultMin = std::min_element(timeDefault.begin(), timeDefault.end()).operator*();
-    double defaultAvg = std::accumulate(timeDefault.begin(), timeDefault.end(), 0.0) / timeDefault.size();
-    double defaultMax = std::max_element(timeDefault.begin(), timeDefault.end()).operator*();
-    double goodMin = std::min_element(timeGood.begin(), timeGood.end()).operator*();
-    double goodAvg = std::accumulate(timeGood.begin(), timeGood.end(), 0.0) / timeGood.size();
-    double goodMax = std::max_element(timeGood.begin(), timeGood.end()).operator*();
-    double bestMin = std::min_element(timeBest.begin(), timeBest.end()).operator*();
-    double bestAvg = std::accumulate(timeBest.begin(), timeBest.end(), 0.0) / timeBest.size();
-    double bestMax = std::max_element(timeBest.begin(), timeBest.end()).operator*();
-
-    std::cout << "// C O M P R E S S I O N ( . S L P )   B E N C H M A R K  \n";
-    std::cout << "// -------------------------------------------\n\n";
-    std::cout << "Number of runs: " << NUM_OF_RUNS << "\n";
-    std::cout << "Total time: " << msTest.count() << "ms\n\n";
-    std::cout << "Fastest - time: average=" << fastestAvg << "ms min=" << fastestMin << "ms max=" << fastestMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputFastest.size() << "\n";
-    std::cout << "Fast - time: average=" << fastAvg << "ms min=" << fastMin << "ms max=" << fastMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputFast.size() << "\n";
-    std::cout << "Default - time: average=" << defaultAvg << "ms min=" << defaultMin << "ms max=" << defaultMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputDefault.size() << "\n";
-    std::cout << "Good - time: average=" << goodAvg << "ms min=" << goodMin << "ms max=" << goodMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputGood.size() << "\n";
-    std::cout << "Best - time: average=" << bestAvg << "ms min=" << bestMin << "ms max=" << bestMax <<
-              "ms - Size (bytes): " << input.size() << "->" << outputBest.size() << "\n";
-
-    std::cout << std::endl;
-
-    //Decompression
-    std::vector<double> timeDecompFastest;
-    std::vector<double> timeDecompFast;
-    std::vector<double> timeDecompDefault;
-    std::vector<double> timeDecompGood;
-    std::vector<double> timeDecompBest;
-
-    auto testDecompStart = std::chrono::steady_clock::now();
-    for(int i = 0; i < NUM_OF_RUNS; ++i)
-    {
-        std::vector<uint8_t> output;
-
-        //Fastest
-        auto startFastest = std::chrono::steady_clock::now();
-        plz::StatusCode status = p.decompress(outputFastest, output);
-        auto endFastest = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msFastest = (endFastest-startFastest) * 1000;
-        timeDecompFastest.push_back(msFastest.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-
-        //Fast
-        auto startFast = std::chrono::steady_clock::now();
-        status = p.decompress(outputFast, output);
-        auto endFast = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msFast = (endFast-startFast) * 1000;
-        timeDecompFast.push_back(msFast.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-
-        //Default
-        auto startDefault = std::chrono::steady_clock::now();
-        status = p.decompress(outputDefault, output);
-        auto endDefault = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msDefault = (endDefault-startDefault) * 1000;
-        timeDecompDefault.push_back(msDefault.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-
-        //Good
-        auto startGood = std::chrono::steady_clock::now();
-        status = p.decompress(outputGood, output);
-        auto endGood = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msGood = (endGood-startGood) * 1000;
-        timeDecompGood.push_back(msGood.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-
-        //Best
-        auto startBest = std::chrono::steady_clock::now();
-        status = p.decompress(outputBest, output);
-        auto endBest = std::chrono::steady_clock::now();
-        std::chrono::duration<double> msBest = (endBest-startBest) * 1000;
-        timeDecompBest.push_back(msBest.count());
-        REQUIRE(status == plz::StatusCode::Ok);
-        output.clear();
-    }
-    auto testDecompStop = std::chrono::steady_clock::now();
-    std::chrono::duration<double> msDecompTest = (testDecompStop-testDecompStart) * 1000;
-
-    double fastestDecompMin = std::min_element(timeDecompFastest.begin(), timeDecompFastest.end()).operator*();
-    double fastestDecompAvg = std::accumulate(timeDecompFastest.begin(), timeDecompFastest.end(), 0.0) / timeDecompFastest.size();
-    double fastestDecompMax = std::max_element(timeDecompFastest.begin(), timeDecompFastest.end()).operator*();
-    double fastDecompMin = std::min_element(timeDecompFast.begin(), timeDecompFast.end()).operator*();
-    double fastDecompAvg = std::accumulate(timeDecompFast.begin(), timeDecompFast.end(), 0.0) / timeDecompFast.size();
-    double fastDecompMax = std::max_element(timeDecompFast.begin(), timeDecompFast.end()).operator*();
-    double defaultDecompMin = std::min_element(timeDecompDefault.begin(), timeDecompDefault.end()).operator*();
-    double defaultDecompAvg = std::accumulate(timeDecompDefault.begin(), timeDecompDefault.end(), 0.0) / timeDecompDefault.size();
-    double defaultDecompMax = std::max_element(timeDecompDefault.begin(), timeDecompDefault.end()).operator*();
-    double goodDecompMin = std::min_element(timeDecompGood.begin(), timeDecompGood.end()).operator*();
-    double goodDecompAvg = std::accumulate(timeDecompGood.begin(), timeDecompGood.end(), 0.0) / timeDecompGood.size();
-    double goodDecompMax = std::max_element(timeDecompGood.begin(), timeDecompGood.end()).operator*();
-    double bestDecompMin = std::min_element(timeDecompBest.begin(), timeDecompBest.end()).operator*();
-    double bestDecompAvg = std::accumulate(timeDecompBest.begin(), timeDecompBest.end(), 0.0) / timeDecompBest.size();
-    double bestDecompMax = std::max_element(timeDecompBest.begin(), timeDecompBest.end()).operator*();
-
-    std::cout << "// D E C O M P R E S S I O N ( . S L P )   B E N C H M A R K  \n";
-    std::cout << "// -----------------------------------------------\n\n";
-    std::cout << "Number of runs: " << NUM_OF_RUNS << "\n";
-    std::cout << "Total time: " << msDecompTest.count() << "ms\n\n";
-    std::cout << "Fastest - time: average=" << fastestDecompAvg << "ms min=" << fastestDecompMin << "ms max=" << fastestDecompMax << "ms\n";
-    std::cout << "Fast - time: average=" << fastDecompAvg << "ms min=" << fastDecompMin << "ms max=" << fastDecompMax << "ms\n";
-    std::cout << "Default - time: average=" << defaultDecompAvg << "ms min=" << defaultDecompMin << "ms max=" << defaultDecompMax << "ms\n";
-    std::cout << "Good - time: average=" << goodDecompAvg << "ms min=" << goodDecompMin << "ms max=" << goodDecompMax << "ms\n";
-    std::cout << "Best - time: average=" << bestDecompAvg << "ms min=" << bestDecompMin << "ms max=" << bestDecompMax << "ms\n";
-
-    std::cout << std::endl;
-
-    REQUIRE(true);
-}
+#endif //RUN_BENCHMARK_TESTS
