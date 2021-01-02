@@ -3,11 +3,17 @@ A singleheader LZMA library for C++11
 
 # Benchmarks
 
-Specs:
-CPU: Intel Core i7-6700 @ 8x 4GHz
-GPU: GeForce GTX 1080
-RAM: 15969MiB
-OS: Linux (Manjaro 20.2 Nibia) - Kernel: x86_64 Linux 4.14.209-1-MANJARO
+**Specs:**
+- **CPU**: Intel Core i7-6700 @ 8x 4GHz
+- **GPU**: GeForce GTX 1080
+- **RAM**: 15969MiB
+- **OS**: Linux (Manjaro 20.2 Nibia) - **Kernel**: x86_64 Linux 4.14.209-1-MANJARO
+
+## .json compression benchmark (20 runs)
+| Preset  | Size before (bytes) | Size after (bytes) | Average time | Min. time |Max. time |
+| :-----: |:------------------: | :-----------------:| :---------------: |:------------:|:------------:| 
+| Fastest |70230                | 3364               | 2.25587 ms        | 1.99016 ms   | 3.17568 ms   | 
+| Fast    |70230                | 3283               |                   |              |              | 
 
 
 // C O M P R E S S I O N   B E N C H M A R K  

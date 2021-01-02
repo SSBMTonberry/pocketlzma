@@ -4,3 +4,4 @@
 ./pocketlzma -cf ./../files/file.json ./../files/fast.lzma
 ./pocketlzma -cg ./../files/file.json ./../files/good.lzma
 ./pocketlzma -cb ./../files/file.json ./../files/best.lzma
+./pocketlzma -d ./../files/compressed.lzma
