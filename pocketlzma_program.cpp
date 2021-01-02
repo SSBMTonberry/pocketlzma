@@ -74,7 +74,7 @@ int compress(const std::string &input, const std::string &output, plz::Preset pr
         return 1;
     }
 
-    std::cout << "Successfully compressed data to '" << output << "' in " << ms.count() << "milliseconds! \n\n";
+    std::cout << "Successfully compressed data to '" << output << "' in " << ms.count() << " milliseconds! \n\n";
 
     return 0;
 }
@@ -113,7 +113,7 @@ int decompress(const std::string &input, const std::string &output)
         return 1;
     }
 
-    std::cout << "Successfully decompressed data to '" << output << "' in " << ms.count() << "milliseconds! \n\n";
+    std::cout << "Successfully decompressed data to '" << output << "' in " << ms.count() << " milliseconds! \n\n";
 
     return 0;
 }
