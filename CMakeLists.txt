@@ -22,8 +22,9 @@ configure_file (
         "${PROJECT_SOURCE_DIR}/src/PocketLzmaConfig.h"
 )
 
-set(SOURCE_FILES pocketlzma_program.cpp)
+set(SOURCE_FILES pocketlzma_program.cpp src/lzma_c/lzma_c.h)
 
 add_executable(pocketlzma ${SOURCE_FILES})
 
 add_subdirectory(tests)
+add_subdirectory(tests_extra)

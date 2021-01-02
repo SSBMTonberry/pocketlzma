@@ -3,7 +3,6 @@
 //
 
 #include "pocketlzma.hpp"
-#include <sstream>
 
 //#include <cstdarg>  // For va_start, etc.
 
@@ -17,6 +16,8 @@ std::string fmt( const std::string& format, Args ... args )
     return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
 }
 
+
+
 const std::string VERSION = fmt("v%d.%d.%d", POCKETLZMA_VERSION_MAJOR, POCKETLZMA_VERSION_MINOR, POCKETLZMA_VERSION_PATCH);
 
 void printHelp()
@@ -28,8 +29,23 @@ void printHelp()
               << "<option> <input> <output>(optional - appending '.lzma' to <input> value when not used)\n"
               << "Example: -c ./file.json ./file.lzma\n\n"
               << "Options: \n"
-              << "-d | --decompress      - Decompress <input> LZMA file \n"
-              << "-c | --compress        - Compress with default preset"
+              << "-h   | --help            - Print help \n"
+              << "-d   | --decompress      - Decompress <input> LZMA file \n"
+              << "-c   | --compress        - Compress with 'Default' preset \n"
+              << "-cf+ | --fastest         - Compress with 'Fastest' preset \n"
+              << "-cf  | --fast            - Compress with 'Fast' preset \n"
+              << "-cg  | --good            - Compress with 'GoodCompression' preset \n"
+              << "-cb  | --best            - Compress with 'BestCompression' preset \n\n";
+}
+
+void compress(const std::string &input, const std::string &output, plz::Preset preset)
+{
+    plz::PocketLzma p {preset};
+}
+
+void decompress(const std::string &input, const std::string &output)
+{
+
 }
 
 int main(int argc, char *argv[])
@@ -39,10 +55,13 @@ int main(int argc, char *argv[])
         std::string action {argv[1]};
         if(action.length() > 0 && action[0] == '-')
         {
-            plz::PocketLzma p;
+
         }
         else
+        {
+            std::cout << "Invalid action: " << action << "\n\n";
             printHelp();
+        }
     }
     else
         printHelp();
