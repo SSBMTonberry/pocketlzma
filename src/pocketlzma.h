@@ -25,6 +25,15 @@
     OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+    IMPORTANT - YOU MUST #define POCKETLZMA_LZMA_C_DEFINE exactly ONCE before the first time you include "pocketlzma.hpp"
+    The reason for this is that the base logic used by PocketLzma is written i C (by Igor Pavlov), thus this is required
+    to make sure the implementations are included only once. In other words: If pocketlzma.hpp is included several places,
+    the #define must not be included anywhere but in one of them.
+
+    Example:
+    #define POCKETLZMA_LZMA_C_DEFINE
+    #include "pocketlzma.hpp"
+
  */
 
 #ifndef POCKETLZMA_POCKETLZMA_H
@@ -54,14 +63,13 @@ namespace plz
 
         #include "lzma_c/LzmaLib.h"
 
-        #ifndef POCKETLZMA_LZMA_C_DEFINED
-        #define POCKETLZMA_LZMA_C_DEFINED
+        #ifdef POCKETLZMA_LZMA_C_DEFINE
             #include "lzma_c/Alloc.c"
             #include "lzma_c/LzmaDec.c"
             #include "lzma_c/LzmaEnc.c"
             #include "lzma_c/LzFind.c"
             #include "lzma_c/LzmaLib.c"
-        #endif //POCKETLZMA_LZMA_C_DEFINED
+        #endif //POCKETLZMA_LZMA_C_DEFINE
     }
 }
 #include "pocketlzma_common.hpp"

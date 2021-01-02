@@ -2,6 +2,7 @@
 // Created by robin on 01.01.2021.
 //
 
+#define POCKETLZMA_LZMA_C_DEFINE
 #include "pocketlzma.hpp"
 
 //#include <cstdarg>  // For va_start, etc.
@@ -50,6 +51,7 @@ void decompress(const std::string &input, const std::string &output)
 
 int main(int argc, char *argv[])
 {
+    plz::PocketLzma p;
     if (argc > 1)
     {
         std::string action {argv[1]};

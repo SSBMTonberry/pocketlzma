@@ -6,7 +6,7 @@
 
 //#define POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
 
-#define POCKETLZMA_LZMA_C_DEFINED
+#define POCKETLZMA_LZMA_C_DEFINE //Do this only once
 
 #ifdef POCKETLZMA_UNIT_TEST_USE_SINGLE_HEADER
 #include "../pocketlzma.hpp"
