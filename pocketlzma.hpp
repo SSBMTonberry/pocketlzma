@@ -30,6 +30,16 @@
 #ifndef POCKETLZMA_POCKETLZMA_H
 #define POCKETLZMA_POCKETLZMA_H
 
+//LZMA C INCLUDES
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
 namespace plz
 {
 	namespace c
@@ -39,11 +49,11 @@ namespace plz
 #ifndef __7Z_TYPES_H
 #define __7Z_TYPES_H
 
-#ifdef _WIN32
-/* #include <windows.h> */
-#endif
+//#ifdef _WIN32
+///* #include <windows.h> */
+//#endif
 
-#include <stddef.h>
+//#include <stddef.h>
 
 #ifndef EXTERN_C_BEGIN
 #ifdef __cplusplus
@@ -917,12 +927,12 @@ EXTERN_C_END
 		#define POCKETLZMA_LZMA_C_DEFINED
 
 /*** Start of inlined file: Alloc.c ***/
-#include <stdio.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
-#include <stdlib.h>
+//#include <stdio.h>
+//
+//#ifdef _WIN32
+//#include <windows.h>
+//#endif
+//#include <stdlib.h>
 
 /* #define _SZ_ALLOC_DEBUG */
 
@@ -1355,7 +1365,7 @@ void AlignOffsetAlloc_CreateVTable(CAlignOffsetAlloc *p)
 
 
 /*** Start of inlined file: LzmaDec.c ***/
-#include <string.h>
+//#include <string.h>
 
 /* #include "CpuArch.h" */
 
@@ -2528,14 +2538,14 @@ SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
 
 
 /*** Start of inlined file: LzmaEnc.c ***/
-#include <string.h>
+//#include <string.h>
 
 /* #define SHOW_STAT */
 /* #define SHOW_STAT2 */
 
-#if defined(SHOW_STAT) || defined(SHOW_STAT2)
-#include <stdio.h>
-#endif
+//#if defined(SHOW_STAT) || defined(SHOW_STAT2)
+//#include <stdio.h>
+//#endif
 
 
 /*** Start of inlined file: LzFind.h ***/
@@ -5483,7 +5493,7 @@ SRes LzmaEncode(Byte *dest, SizeT *destLen, const Byte *src, SizeT srcLen,
 
 
 /*** Start of inlined file: LzFind.c ***/
-#include <string.h>
+//#include <string.h>
 
 
 /*** Start of inlined file: LzHash.h ***/
@@ -6708,7 +6718,7 @@ MY_STDAPI LzmaUncompress(unsigned char *dest, size_t *destLen, const unsigned ch
 
 #include <cstdio>
 #include <cstdlib>
-#include <string.h>
+#include <string>
 
 namespace plz
 {

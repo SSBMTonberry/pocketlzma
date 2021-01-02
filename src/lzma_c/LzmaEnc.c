@@ -3,14 +3,14 @@
 
 #include "Precomp.h"
 
-#include <string.h>
+//#include <string.h>
 
 /* #define SHOW_STAT */
 /* #define SHOW_STAT2 */
 
-#if defined(SHOW_STAT) || defined(SHOW_STAT2)
-#include <stdio.h>
-#endif
+//#if defined(SHOW_STAT) || defined(SHOW_STAT2)
+//#include <stdio.h>
+//#endif
 
 #include "LzmaEnc.h"
 

@@ -10,7 +10,7 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <string.h>
+#include <string>
 
 namespace plz
 {

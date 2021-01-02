@@ -30,6 +30,17 @@
 #ifndef POCKETLZMA_POCKETLZMA_H
 #define POCKETLZMA_POCKETLZMA_H
 
+//LZMA C INCLUDES
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+
 namespace plz
 {
     namespace c

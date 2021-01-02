@@ -4,11 +4,11 @@
 #ifndef __7Z_TYPES_H
 #define __7Z_TYPES_H
 
-#ifdef _WIN32
-/* #include <windows.h> */
-#endif
+//#ifdef _WIN32
+///* #include <windows.h> */
+//#endif
 
-#include <stddef.h>
+//#include <stddef.h>
 
 #ifndef EXTERN_C_BEGIN
 #ifdef __cplusplus

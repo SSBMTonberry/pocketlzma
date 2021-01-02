@@ -3,7 +3,7 @@
 
 #include "Precomp.h"
 
-#include <string.h>
+//#include <string.h>
 
 #include "LzFind.h"
 #include "LzHash.h"

@@ -3,7 +3,7 @@
 
 #include "Precomp.h"
 
-#include <string.h>
+//#include <string.h>
 
 /* #include "CpuArch.h" */
 #include "LzmaDec.h"
