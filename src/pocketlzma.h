@@ -40,6 +40,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "PocketLzmaConfig.h"
 
 namespace plz
 {

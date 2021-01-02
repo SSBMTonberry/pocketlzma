@@ -40,6 +40,14 @@
 #include <cstdlib>
 #include <cstring>
 
+
+/*** Start of inlined file: PocketLzmaConfig.h ***/
+#define POCKETLZMA_VERSION_MAJOR 1
+#define POCKETLZMA_VERSION_MINOR 0
+#define POCKETLZMA_VERSION_PATCH 0
+
+/*** End of inlined file: PocketLzmaConfig.h ***/
+
 namespace plz
 {
 	namespace c
