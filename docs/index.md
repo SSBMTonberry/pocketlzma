@@ -15,7 +15,7 @@ There is a `Doxygen` generated documentation of PocketLzma that can be found [HE
 # How to use PocketLzma
 PocketLzma is first of all designed to be easy to use! If you want to see a fully working code example, take a look at the `pocketlzma_program.cpp` file in the root folder of this project. Otherwise: Follow along for some short examples.
 
-### First an important note! Since PocketLzma internally uses Igor Pavlov's C code, you are required to `#define POCKETLZMA_LZMA_C_DEFINE` ONCE (and only once) before including `pocketlzma.hpp`. The reason for this is to make sure the implementations of the C-code are only included once. In other words: If you include the `pocketlzma.hpp` file several places in your project, the other places must not use the `#define`   
+#### First an important note! Since PocketLzma internally uses Igor Pavlov's C code, you are required to `#define POCKETLZMA_LZMA_C_DEFINE` ONCE (and only once) before including `pocketlzma.hpp`. The reason for this is to make sure the implementations of the C-code are only included once. In other words: If you include the `pocketlzma.hpp` file several places in your project, the other places must not use the `#define`   
 
 ## The File API
 PocketLzma has a very simple API for file communication. However, you are free to use something else
