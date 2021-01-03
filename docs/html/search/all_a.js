@@ -1,0 +1,25 @@
+var searchData=
+[
+  ['c_49',['c',['../namespaceplz_1_1c.html',1,'plz']]],
+  ['plz_50',['plz',['../namespaceplz.html',1,'']]],
+  ['plz_5fbuffer_5fsize_51',['PLZ_BUFFER_SIZE',['../namespaceplz.html#a9c1bab791849c478700224fdfe47cbb7',1,'plz']]],
+  ['plz_5fmax_5fdictionary_5fsize_52',['PLZ_MAX_DICTIONARY_SIZE',['../namespaceplz.html#a9b6b8248a8dd53d35499764a0fb94717',1,'plz']]],
+  ['plz_5fmax_5ffast_5fbytes_53',['PLZ_MAX_FAST_BYTES',['../namespaceplz.html#aa6085eafc692726d2fedf5b5e530e643',1,'plz']]],
+  ['plz_5fmax_5flevel_54',['PLZ_MAX_LEVEL',['../namespaceplz.html#ac664a2cdd82a35af64036ea70d403062',1,'plz']]],
+  ['plz_5fmax_5fliteral_5fcontext_5fbits_55',['PLZ_MAX_LITERAL_CONTEXT_BITS',['../namespaceplz.html#aef22a9bc7f4a9218e091e0875a1f9731',1,'plz']]],
+  ['plz_5fmax_5fliteral_5fposition_5fbits_56',['PLZ_MAX_LITERAL_POSITION_BITS',['../namespaceplz.html#aacbf52eb0a3767301bfded2ba00b80ee',1,'plz']]],
+  ['plz_5fmax_5fposition_5fbits_57',['PLZ_MAX_POSITION_BITS',['../namespaceplz.html#a495a90d52d02037522ee7ea8737e1001',1,'plz']]],
+  ['plz_5fmin_5fdictionary_5fsize_58',['PLZ_MIN_DICTIONARY_SIZE',['../namespaceplz.html#a7ee23e245814c48b34e62d3351e98515',1,'plz']]],
+  ['plz_5fmin_5ffast_5fbytes_59',['PLZ_MIN_FAST_BYTES',['../namespaceplz.html#a0df5b11a548a7af91ba14363146f9649',1,'plz']]],
+  ['plz_5fminimum_5flzma_5fsize_60',['PLZ_MINIMUM_LZMA_SIZE',['../namespaceplz.html#a9da196ee482915c7f1ad2224b5b88ad7',1,'plz']]],
+  ['pocketlzma_61',['PocketLzma',['../classplz_1_1PocketLzma.html',1,'plz::PocketLzma'],['../classplz_1_1PocketLzma.html#a40aa192616f680ede6f318b65d4dd05a',1,'plz::PocketLzma::PocketLzma()=default'],['../classplz_1_1PocketLzma.html#abf709fc680f8f3019dce62e0c8c67ab8',1,'plz::PocketLzma::PocketLzma(Preset preset)'],['../classplz_1_1PocketLzma.html#a6aec8bb1d4226a88689857f057f11596',1,'plz::PocketLzma::PocketLzma(const Settings &amp;settings)']]],
+  ['pocketlzma_2eh_62',['pocketlzma.h',['../pocketlzma_8h.html',1,'']]],
+  ['pocketlzma_5fclass_2ehpp_63',['pocketlzma_class.hpp',['../pocketlzma__class_8hpp.html',1,'']]],
+  ['pocketlzma_5fcommon_2ehpp_64',['pocketlzma_common.hpp',['../pocketlzma__common_8hpp.html',1,'']]],
+  ['pocketlzma_5fversion_5fmajor_65',['POCKETLZMA_VERSION_MAJOR',['../PocketLzmaConfig_8h.html#a6d8a3b4eb6fbccfa9c263e9c126748a3',1,'PocketLzmaConfig.h']]],
+  ['pocketlzma_5fversion_5fminor_66',['POCKETLZMA_VERSION_MINOR',['../PocketLzmaConfig_8h.html#afeb77d781a57b6d8b42348d946a6c115',1,'PocketLzmaConfig.h']]],
+  ['pocketlzma_5fversion_5fpatch_67',['POCKETLZMA_VERSION_PATCH',['../PocketLzmaConfig_8h.html#a196317898f98d0eb6fd9c5c90ea415e3',1,'PocketLzmaConfig.h']]],
+  ['pocketlzmaconfig_2eh_68',['PocketLzmaConfig.h',['../PocketLzmaConfig_8h.html',1,'']]],
+  ['positionbits_69',['positionBits',['../classplz_1_1Settings.html#a0dd51574478e78f486ce5b7d08ba6fb3',1,'plz::Settings']]],
+  ['preset_70',['Preset',['../namespaceplz.html#a0a5202cef968a7019be130a177a90790',1,'plz']]]
+];
