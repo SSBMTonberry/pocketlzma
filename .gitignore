@@ -6,3 +6,5 @@ cmake-build-debug/
 .idea/
 
 cmake-build-minsizerel/
+
+.DS_Store
