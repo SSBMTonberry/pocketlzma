@@ -162,7 +162,29 @@ int main()
 You can use data directly from memory (both for compression and decompression), if you please. If you need a program to generate in-memory files, you can use my [f2src](https://github.com/SSBMTonberry/f2src/) program to do that job for you.
 
 ```c++
+plz::PocketLzma p;
 
+//Alternative 1
+std::vector<uint8_t> decompressed;
+plz::StatusCode status = p.decompress(memfiles::_JSON_TEST_OK_HEADER_LZMA, 
+                                      memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE, 
+                                      decompressed);
+
+...
+
+//Alternative 2
+std::vector<uint8_t> bytes = plz::File::FromMemory(memfiles::_JSON_TEST_OK_HEADER_LZMA, 
+                                                   memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE);
+status = p.decompress(bytes, decompressed);
+
+...
+
+//Alternative 3
+std::vector<uint8_t> bytes;
+plz::File::FromMemory(memfiles::_JSON_TEST_OK_HEADER_LZMA, 
+                      memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE, 
+                      bytes);
+status = p.decompress(bytes, decompressed);
 ```
 
 # Benchmarks
@@ -210,4 +232,6 @@ You can use data directly from memory (both for compression and decompression), 
 | BestCompression         |520358 bytes |4145823 bytes|  74.3353 ms       | 74.1313 ms   | 74.5187 ms   |
 
 # Credits
-All credits goes to **Igor Pavlov**, the genius behind the LZMA compression algorithm. 
+All credits goes to **Igor Pavlov**, the genius behind the LZMA compression algorithm. He has distributed all his work under Public Domain for anyone to use. PocketLzma uses parts of Igor Pavlov's LZMA related C code in [LZMA SDK v19.00](https://www.7-zip.org/sdk.html).
+
+While PocketLzma goes under the still very permissive `BSD-2-Clause License` I've created an optional cross-platform amalgamated `lzma_c.hpp`, which contains a slightly altered version of Igor Pavlov's LZMA implementation for C, and is released under the same Public Domain license to honor Igor's work. This can be found in the `extras` folder, but keep in mind that this file is not supported in any way and may not co-exist with PocketLzma. 

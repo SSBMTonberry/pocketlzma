@@ -31,6 +31,7 @@ namespace plz
 
     void File::FromMemory(const void *data, size_t size, std::vector<uint8_t> &output)
     {
+        output.resize(size);
         plz::MemoryStream mem {(uint8_t *)data, size};
         mem.read((char *)&output[0], size);
     }

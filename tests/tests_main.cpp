@@ -402,6 +402,34 @@ TEST_CASE( "Compress and Decompress a Slippi replay with compression preset Good
     REQUIRE(ms2 < ms1);
 }
 
+TEST_CASE( "Full memory test - expect success", "[memory]" )
+{
+
+    plz::PocketLzma p;
+
+    //Alternative 1
+    std::vector<uint8_t> decompressed;
+    plz::StatusCode status = p.decompress(memfiles::_JSON_TEST_OK_HEADER_LZMA, memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE, decompressed);
+
+    REQUIRE(status == plz::StatusCode::Ok);
+    decompressed.clear();
+
+    //Alternative 2
+    std::vector<uint8_t> bytes = plz::File::FromMemory(memfiles::_JSON_TEST_OK_HEADER_LZMA, memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE);
+    status = p.decompress(bytes, decompressed);
+
+    REQUIRE(status == plz::StatusCode::Ok);
+    decompressed.clear();
+    bytes.clear();
+
+    //Alternative 3
+    //std::vector<uint8_t> bytes;
+    plz::File::FromMemory(memfiles::_JSON_TEST_OK_HEADER_LZMA, memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE, bytes);
+    status = p.decompress(bytes, decompressed);
+
+    REQUIRE(status == plz::StatusCode::Ok);
+}
+
 #ifdef RUN_BENCHMARK_TESTS
     TEST_CASE( "BENCHMARK json - Compress and decompress json with all compression presets - calculate average", "[compression]" )
     {
@@ -887,3 +915,4 @@ TEST_CASE( "Dummy - never fail!", "[dummy]" )
 //
 //    REQUIRE(true);
 //}
+
