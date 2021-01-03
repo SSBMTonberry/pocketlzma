@@ -829,3 +829,61 @@ TEST_CASE( "Compress and Decompress a Slippi replay with compression preset Good
         REQUIRE(true);
     }
 #endif //RUN_BENCHMARK_TESTS
+
+TEST_CASE( "Dummy - never fail!", "[dummy]" )
+{
+    std::string path = "./../../content/to_compress/to/j.lzma";
+    std::vector<uint8_t> data;
+    std::vector<uint8_t> decompressedData;
+    plz::FileStatus fileStatus = plz::File::FromFile(path, data);
+    if(fileStatus.status() == plz::FileStatus::Code::Ok)
+    {
+        //No settings / presets are used during decompression!
+        plz::PocketLzma p;
+        plz::StatusCode status = p.decompress(data, decompressedData);
+        if(status == plz::StatusCode::Ok)
+        {
+            std::string outputPath = "./../../content/to_compress/from/j.json";
+            plz::FileStatus writeStatus = plz::File::ToFile(outputPath, decompressedData);
+            if(writeStatus.status() == plz::FileStatus::Code::Ok)
+            {
+                //Process completed successfully!
+            }
+        }
+    }
+
+    REQUIRE(true);
+}
+
+//TEST_CASE( "Dummy2 - never fail!", "[dummy]" )
+//{
+//    std::string path = "./yourFile.txt";
+//
+//    //When you are 100% sure your loading will never fail, you can use this
+//    std::vector<uint8_t> data1 = plz::File::FromFile(path);
+//
+//    //However - I recommend to use this overload instead:
+//    std::vector<uint8_t> data2;
+//    plz::FileStatus fileStatus = plz::File::FromFile(path, data2);
+//    //If something went wrong
+//    if(fileStatus.status() != plz::FileStatus::Code::Ok)
+//    {
+//        plz::FileStatus::Code statusCode = fileStatus.status(); //PocketLzma status code. Will be useful if errors not causing exceptions happen.
+//
+//        //You may or may not have some error information here
+//        int code = fileStatus.code();                       //Code returned from the OS in cases where an exception is thrown
+//        std::string msg = fileStatus.message();             //Message from the OS in cases where an exception is thrown
+//        std::string exception = fileStatus.exception();     //Exception message from the OS in cases where an exception is thrown
+//        std::string category = fileStatus.category();       //Error category defined bythe OS in cases where an exception is thrown
+//    }
+//
+//    //You can use memory data directly in PocketLzma, but you can use this if you want to transform them into a byte vector.
+//    std::vector<uint8_t> memoryData;
+//    plz::File::FromMemory(memfiles::_JSON_TEST_OK_HEADER_LZMA, memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE, memoryData);
+//
+//    //Finally, you can write to files like this
+//    std::string writePath = "./yourOutputFile.txt";
+//    plz::FileStatus fileWriteStatus = plz::File::ToFile(writePath, data2);
+//
+//    REQUIRE(true);
+//}

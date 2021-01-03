@@ -1,5 +1,169 @@
-# pocketlzma
-A singleheader LZMA library for C++11
+# PocketLzma
+PocketLzma is a cross-platform singleheader `LZMA` compression/decompression library for C++11. To use it, all you need is one
+`pocketlzma.hpp` file, and you are good to go! The library is able to read data from both `files` and `memory`!
+
+PocketLzma is designed to be a mix of a modern yet portable C++ library, only utilizing C++11 to make sure it can be used in projects where the latest versions of C++ are not available or otherwise not allowed to use.
+
+# What is LZMA?
+LZMA stands for Lempel–Ziv–Markov chain Algorithm, and is an algorithm used for lossless data compression.
+The algorithm has been developed by **Igor Pavlov** since the late 90s. The C implementation made by Igor Pavlov is in fact what provides the core functionalty required for PocketLzma to work (with a few modifications to make it cross-platform and single-header compatible).
+
+# How to use PocketLzma
+PocketLzma is first of all designed to be easy to use! If you want to see a fully working code example, take a look at the `pocketlzma_program.cpp` file in the root folder of this project. Otherwise: Follow along for some short examples.
+
+### First an important note! Since PocketLzma internally uses Igor Pavlov's C code, you are required to `#define POCKETLZMA_LZMA_C_DEFINE` ONCE (and only once) before including `pocketlzma.hpp`. The reason for this is to make sure the implementations of the C-code are only included once. In other words: If you include the `pocketlzma.hpp` file several places in your project, the other places must not use the `#define`   
+
+## The File API
+PocketLzma has a very simple API for file communication. However, you are free to use something else
+if you want. PocketLzma doesn't care how you got your data.
+Example:
+
+```c++
+std::string path = "./yourFile.txt";
+
+//When you are 100% sure your loading will never fail, you can use this
+std::vector<uint8_t> data1 = plz::File::FromFile(path);
+
+//However - I recommend to use this overload instead:
+std::vector<uint8_t> data2;
+plz::FileStatus fileStatus = plz::File::FromFile(path, data2);
+//If something went wrong
+if(fileStatus.status() != plz::FileStatus::Code::Ok)
+{
+    plz::FileStatus::Code statusCode = fileStatus.status(); //PocketLzma status code. Will be useful if errors not causing exceptions happen.
+    
+    //You may or may not have some error information here
+    int code = fileStatus.code();                       //Code returned from the OS in cases where an exception is thrown
+    std::string msg = fileStatus.message();             //Message from the OS in cases where an exception is thrown
+    std::string exception = fileStatus.exception();     //Exception message from the OS in cases where an exception is thrown
+    std::string category = fileStatus.category();       //Error category defined bythe OS in cases where an exception is thrown
+}
+
+//You can use memory data directly in PocketLzma, but you can use this if you want to transform them into a byte vector.
+std::vector<uint8_t> memoryData;
+plz::File::FromMemory(memfiles::_JSON_TEST_OK_HEADER_LZMA, memfiles::_JSON_TEST_OK_HEADER_LZMA_SIZE, memoryData);
+
+//Finally, you can write to files like this
+std::string writePath = "./yourOutputFile.txt";
+plz::FileStatus fileWriteStatus = plz::File::ToFile(writePath, data2);
+
+```
+
+## Compression
+```c++
+#define POCKETLZMA_LZMA_C_DEFINE
+#include "pocketlzma.hpp"
+
+int main()
+{
+    std::string path = "./../../content/to_compress/from/json_test.json";
+    std::vector<uint8_t> data;
+    std::vector<uint8_t> compressedData;
+    plz::FileStatus fileStatus = plz::File::FromFile(path, data);
+    if(fileStatus.status() == plz::FileStatus::Code::Ok)
+    {
+        plz::PocketLzma p;
+        /*!
+         *  Possibilities:
+         *  Default
+         *  Fastest
+         *  Fast
+         *  GoodCompression
+         *  BestCompression
+         */
+        p.usePreset(plz::Preset::GoodCompression); //Default is used when preset is not set.
+        plz::StatusCode status = p.compress(data, compressedData);
+        if(status == plz::StatusCode::Ok)
+        {
+            std::string outputPath = "./../../content/to_compress/to/j.lzma";
+            plz::FileStatus writeStatus = plz::File::ToFile(outputPath, compressedData);
+            if(writeStatus.status() == plz::FileStatus::Code::Ok)
+            {
+                //Process completed successfully!
+            }
+        }
+    }
+    return 0;
+}
+```
+
+## Compression (Advanced)
+If you are familiar with LZMA, you can use your own compression settings rather than using presets. Making it possible to tune every parameter to get your own balance of speed and compression ratio.
+
+```c++
+#define POCKETLZMA_LZMA_C_DEFINE
+#include "pocketlzma.hpp"
+
+int main()
+{
+    std::string path = "./../../content/to_compress/from/json_test.json";
+    std::vector<uint8_t> data;
+    std::vector<uint8_t> compressedData;
+    plz::FileStatus fileStatus = plz::File::FromFile(path, data);
+    if(fileStatus.status() == plz::FileStatus::Code::Ok)
+    {
+        plz::Settings settings;
+        // These are actual default values used when choosing the Default preset,
+        // but shows the parameters that can be tuned
+        settings.level                = 5;
+        settings.dictionarySize       = 1 << 24;
+        settings.literalContextBits   = 3;
+        settings.literalPositionBits  = 0;
+        settings.positionBits         = 2;
+        settings.fastBytes            = 32;
+
+        plz::PocketLzma p {settings}; //You can alternatively use: p.setSettings(settings);
+        plz::StatusCode status = p.compress(data, compressedData);
+        if(status == plz::StatusCode::Ok)
+        {
+            std::string outputPath = "./../../content/to_compress/to/j.lzma";
+            plz::FileStatus writeStatus = plz::File::ToFile(outputPath, compressedData);
+            if(writeStatus.status() == plz::FileStatus::Code::Ok)
+            {
+                //Process completed successfully!
+            }
+        }
+    }
+    return 0;
+}
+```
+
+## Decompression
+```c++
+#define POCKETLZMA_LZMA_C_DEFINE
+#include "pocketlzma.hpp"
+
+int main()
+{
+    std::string path = "./../../content/to_compress/to/j.lzma";
+    std::vector<uint8_t> data;
+    std::vector<uint8_t> decompressedData;
+    plz::FileStatus fileStatus = plz::File::FromFile(path, data);
+    if(fileStatus.status() == plz::FileStatus::Code::Ok)
+    {
+        //No settings / presets are used during decompression!
+        plz::PocketLzma p;
+        plz::StatusCode status = p.decompress(data, decompressedData);
+        if(status == plz::StatusCode::Ok)
+        {
+            std::string outputPath = "./../../content/to_compress/from/j.json";
+            plz::FileStatus writeStatus = plz::File::ToFile(outputPath, decompressedData);
+            if(writeStatus.status() == plz::FileStatus::Code::Ok)
+            {
+                //Process completed successfully!
+            }
+        }
+    }
+    return 0;
+}
+```
+
+## Decompression using data from memory
+You can use data directly from memory (both for compression and decompression), if you please. If you need a program to generate in-memory files, you can use my [f2src](https://github.com/SSBMTonberry/f2src/) program to do that job for you.
+
+```c++
+
+```
 
 # Benchmarks
 
@@ -45,3 +209,5 @@ A singleheader LZMA library for C++11
 | GoodCompression         |521168 bytes |4145823 bytes|  74.8225 ms       | 74.1976 ms   | 76.2949 ms   |
 | BestCompression         |520358 bytes |4145823 bytes|  74.3353 ms       | 74.1313 ms   | 74.5187 ms   |
 
+# Credits
+All credits goes to **Igor Pavlov**, the genius behind the LZMA compression algorithm. 
