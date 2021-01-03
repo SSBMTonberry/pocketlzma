@@ -7,10 +7,10 @@ for all of us to use as we please. So all credit for the LZMA logic here goes to
 Amalgamation (single-header) and cross-platform modifications done by Robin Berg Pettersen.
 NOTE: In order to make this cross-platform, all multithreading logic had to be removed.
 
-Use at own risk. There is absolutely NO SUPPORT for using this file. 
+Use at own risk. **There is absolutely NO SUPPORT** for using this file. 
 
-To be able to use this, you must define "LZMA_C_DEFINE" ONCE before including "lzma_c.hpp", like this:
-
+To be able to use this, you must `define "LZMA_C_DEFINE"` **ONCE** before including `"lzma_c.hpp"`, like this:
+```c
 #define LZMA_C_DEFINE
 #include "lzma_c.hpp"
-
+```
