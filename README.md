@@ -8,6 +8,10 @@ PocketLzma is designed to be a mix of a modern yet portable C++ library, only ut
 LZMA stands for Lempel–Ziv–Markov chain Algorithm, and is an algorithm used for lossless data compression.
 The algorithm has been developed by **Igor Pavlov** since the late 90s. The C implementation made by Igor Pavlov is in fact what provides the core functionalty required for PocketLzma to work (with a few modifications to make it cross-platform and single-header compatible).
 
+## Documentation
+
+There is a `Doxygen` generated documentation of PocketLzma that can be found [HERE](https://ssbmtonberry.github.io/pocketlzma/html/)
+
 # How to use PocketLzma
 PocketLzma is first of all designed to be easy to use! If you want to see a fully working code example, take a look at the `pocketlzma_program.cpp` file in the root folder of this project. Otherwise: Follow along for some short examples.
 
