@@ -70,12 +70,13 @@ namespace plz
     {
         m_settings.validate();
         size_t propsSize = LZMA_PROPS_SIZE;
-        uint8_t propsEncoded[propsSize];
+        uint8_t propsEncoded[LZMA_PROPS_SIZE];
 
         size_t outSize = inputSize + (inputSize / 3) + 128;
-        uint8_t out[outSize];
+        //uint8_t out[outSize];
+        std::unique_ptr<uint8_t[]> out(new uint8_t[outSize]);
 
-        int rc = plz::c::LzmaCompress(out, &outSize, input, inputSize, propsEncoded, &propsSize, m_settings.level, m_settings.dictionarySize,
+        int rc = plz::c::LzmaCompress(&out[0], &outSize, input, inputSize, propsEncoded, &propsSize, m_settings.level, m_settings.dictionarySize,
                                       m_settings.literalContextBits,m_settings.literalPositionBits,m_settings.positionBits,m_settings.fastBytes,1);
 
         StatusCode status = static_cast<StatusCode>(rc);
@@ -87,7 +88,7 @@ namespace plz
 
             output.insert(output.end(), propsEncoded, propsEncoded + propsSize); // Property header
             output.insert(output.end(), sizeBits.begin(), sizeBits.end());           // Add decompress size information
-            output.insert(output.end(), out, out + outSize);                     // Data
+            output.insert(output.end(), out.get(), out.get() + outSize);                     // Data
         }
 
         return status;
@@ -139,15 +140,16 @@ namespace plz
         if(sizeInfoMissing)
             return decompressBuffered(input, inputSize, output, PLZ_BUFFER_SIZE); //StatusCode::MissingSizeInfoInHeader;
 
-        uint8_t out[size];
         size_t outSize = size;
+        //uint8_t out[size];
+        std::unique_ptr<uint8_t[]> out(new uint8_t[size]);
 
         size_t inSize = inputSize - propsSize;
-        int rc = plz::c::LzmaUncompress(out, &outSize, &input[propsSize], &inSize, &input[0], LZMA_PROPS_SIZE);
+        int rc = plz::c::LzmaUncompress(&out[0], &outSize, &input[propsSize], &inSize, &input[0], LZMA_PROPS_SIZE);
 
         StatusCode status = static_cast<StatusCode>(rc);
 
-        output.insert(output.end(), out, out + outSize);
+        output.insert(output.end(), out.get(), out.get() + outSize);
 
         return status;
     }
@@ -192,13 +194,13 @@ namespace plz
         if(inputSize <= PLZ_MINIMUM_LZMA_SIZE)
             return StatusCode::InvalidLzmaData;
 
-        size_t unpackSize;
+        //size_t unpackSize = 0;
 
         plz::c::CLzmaDec state;
         size_t propsSize = LZMA_PROPS_SIZE + 8; //header + decompress_size
 
         /* header: 5 bytes of LZMA properties and 8 bytes of uncompressed size */
-        unsigned char header[propsSize];
+        unsigned char header[LZMA_PROPS_SIZE + 8]; //MSVC requires this fully constant...
 
         //Read header data
         for(int i = 0; i < propsSize; ++i)
@@ -208,7 +210,8 @@ namespace plz
         int res = 0;
         res = LzmaDec_Allocate(&state, header, LZMA_PROPS_SIZE, &plz::c::g_Alloc);
 
-        uint8_t outBuf[bufferSize];
+        //uint8_t outBuf[bufferSize];
+        std::unique_ptr<uint8_t[]> outBuf(new uint8_t[bufferSize]);
         size_t inPos = 0, inSize = 0, outPos = 0;
         inSize = inputSize - propsSize;
         plz::c::LzmaDec_Init(&state);
@@ -221,15 +224,15 @@ namespace plz
                 plz::c::ELzmaStatus status;
 
 
-                res = plz::c::LzmaDec_DecodeToBuf(&state, outBuf + outPos, &outProcessed,
+                res = plz::c::LzmaDec_DecodeToBuf(&state, outBuf.get() + outPos, &outProcessed,
                                                   &input[propsSize] + inPos, &inProcessed, finishMode, &status);
 
 
                 inPos += inProcessed;
                 outPos += outProcessed;
-                unpackSize -= outProcessed;
+                //unpackSize -= outProcessed;
 
-                output.insert(output.end(), outBuf, outBuf + outPos);
+                output.insert(output.end(), outBuf.get(), outBuf.get() + outPos);
 
                 outPos = 0;
 
