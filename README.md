@@ -1,3 +1,8 @@
+[![Windows (MSVC)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-windows-msvc.yml/badge.svg)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-windows-msvc.yml)
+[![Linux (GCC)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-linux-gcc.yml/badge.svg)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-linux-gcc.yml)
+[![Linux (Clang)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-linux-clang.yml/badge.svg)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-linux-clang.yml)
+[![MacOS (Clang)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-macos-clang.yml/badge.svg)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-macos-clang.yml)
+
 # PocketLzma
 PocketLzma is a cross-platform singleheader `LZMA` compression/decompression library for C++11. To use it, all you need is one
 `pocketlzma.hpp` file, and you are good to go! The library is able to read data from both `files` and `memory`!
