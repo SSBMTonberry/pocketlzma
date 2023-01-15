@@ -193,13 +193,15 @@ status = p.decompress(bytes, decompressed);
 
 # Benchmarks
 
+## Benchmark 1 (v1.0)
+
 ### **Specs:**
 - **CPU**: Intel Core i7-6700 @ 8x 4GHz
 - **GPU**: GeForce GTX 1080
 - **RAM**: 15969MiB
 - **OS**: Linux (Manjaro 20.2 Nibia) - **Kernel**: x86_64 Linux 4.14.209-1-MANJARO
 
-## .json compression benchmark (20 runs)
+### .json compression benchmark (20 runs)
 | Preset          | Size before | Size after | Average time      | Min. time    |Max. time     |
 | :-----:         |:----------: | :---------:| :---------------: |:------------:|:------------:|
 | Fastest         |70230 bytes  | 3364 bytes |  2.25587 ms       | 1.99016 ms   | 3.17568 ms   |
@@ -208,7 +210,7 @@ status = p.decompress(bytes, decompressed);
 | GoodCompression |70230 bytes  | 2485 bytes |  30.6193 ms       | 28.5697 ms   | 38.3485 ms   |
 | BestCompression |70230 bytes  | 2451 bytes |  45.8248 ms       | 43.4147 ms   | 57.934  ms   |
 
-## .json decompression benchmark (20 runs)
+### .json decompression benchmark (20 runs)
 | Preset (when compressed)| Size before | Size after | Average time      | Min. time    |Max. time     |
 | :-----:                 |:----------: | :---------:| :---------------: |:------------:|:------------:|
 | Fastest                 |3364 bytes   | 70230 bytes|  0.502977 ms      | 0.497585 ms  | 0.536352 ms  |
@@ -217,7 +219,7 @@ status = p.decompress(bytes, decompressed);
 | GoodCompression         |2485 bytes   | 70230 bytes|  0.405111 ms      | 0.402765 ms  | 0.419498 ms  |
 | BestCompression         |2451 bytes   | 70230 bytes|  0.401403 ms      | 0.400253 ms  | 0.406537 ms  |
 
-## .slp (binary file) compression benchmark (5 runs)
+### .slp (binary file) compression benchmark (5 runs)
 | Preset          | Size before | Size after | Average time      | Min. time    |Max. time     |
 | :-----:         |:----------: | :---------:| :---------------: |:------------:|:------------:|
 | Fastest         |4145823 bytes|702789 bytes|  253.102 ms       | 232.259 ms   | 330.66 ms    |
@@ -226,7 +228,7 @@ status = p.decompress(bytes, decompressed);
 | GoodCompression |4145823 bytes|521168 bytes|  2888.82 ms       | 2879.99 ms   | 2915.07 ms   |
 | BestCompression |4145823 bytes|520358 bytes|  3140.49 ms       | 3107.47 ms   | 3168.36 ms   |
 
-## .slp (binary file) decompression benchmark (5 runs)
+### .slp (binary file) decompression benchmark (5 runs)
 | Preset (when compressed)| Size before | Size after  | Average time      | Min. time    |Max. time     |
 | :-----:                 |:----------: | :----------:| :---------------: |:------------:|:------------:|
 | Fastest                 |702789 bytes |4145823 bytes|  85.5723 ms       | 84.871 ms    | 87.2708 ms   |
@@ -234,6 +236,50 @@ status = p.decompress(bytes, decompressed);
 | Default                 |572742 bytes |4145823 bytes|  78.0439 ms       | 77.7491 ms   | 78.7667 ms   |
 | GoodCompression         |521168 bytes |4145823 bytes|  74.8225 ms       | 74.1976 ms   | 76.2949 ms   |
 | BestCompression         |520358 bytes |4145823 bytes|  74.3353 ms       | 74.1313 ms   | 74.5187 ms   |
+
+## Benchmark 2 (v1.0)
+
+### **Specs:**
+- **CPU**: AMD Ryzen 9 5900X 12-Core @ 24x 3.7GHz
+- **GPU**: NVIDIA GeForce RTX 3070
+- **RAM**: 64216MiB
+- **OS**: Manjaro 22.0.0 Sikaris - **Kernel**: x86_64 Linux 6.1.1-1-MANJARO
+
+### .json compression benchmark (20 runs)
+| Preset          | Size before | Size after | Average time      | Min. time    |Max. time     |
+| :-----:         |:----------: | :---------:| :---------------: |:------------:|:------------:|
+| Fastest         |70230 bytes  | 3364 bytes |  1.59219 ms       | 1.56588 ms   | 1.64618 ms   |
+| Fast            |70230 bytes  | 3283 bytes |  1.61954 ms       | 1.59797 ms   | 1.64774 ms   |
+| Default         |70230 bytes  | 2693 bytes |  16.1286 ms       | 16.0635 ms   | 16.2337 ms   |
+| GoodCompression |70230 bytes  | 2485 bytes |  23.406 ms        | 23.3383 ms   | 23.4833 ms   |
+| BestCompression |70230 bytes  | 2451 bytes |  33.297 ms        | 33.2173 ms   | 33.3923 ms   |
+
+### .json decompression benchmark (20 runs)
+| Preset (when compressed)| Size before | Size after | Average time      | Min. time    |Max. time     |
+| :-----:                 |:----------: | :---------:| :---------------: |:------------:|:------------:|
+| Fastest                 |3364 bytes   | 70230 bytes|  0.439825 ms      | 0.434139 ms  | 0.46326 ms   |
+| Fast                    |3283 bytes   | 70230 bytes|  0.428657 ms      | 0.423007 ms  | 0.442026 ms  |
+| Default                 |2693 bytes   | 70230 bytes|  0.372001 ms      | 0.367842 ms  | 0.384697 ms  |
+| GoodCompression         |2485 bytes   | 70230 bytes|  0.348721 ms      | 0.344513 ms  | 0.357992 ms  |
+| BestCompression         |2451 bytes   | 70230 bytes|  0.342951 ms      | 0.339283 ms  | 0.349383 ms  |
+
+### .slp (binary file) compression benchmark (5 runs)
+| Preset          | Size before | Size after | Average time      | Min. time    |Max. time     |
+| :-----:         |:----------: | :---------:| :---------------: |:------------:|:------------:|
+| Fastest         |4145823 bytes|702789 bytes|  213.921 ms       | 210.741 ms   | 219.284 ms    |
+| Fast            |4145823 bytes|677754 bytes|  312.135 ms       | 252.705 ms   | 455.46 ms   |
+| Default         |4145823 bytes|572742 bytes|  1753.65 ms       | 1599.1 ms    | 2098.83 ms   |
+| GoodCompression |4145823 bytes|521168 bytes|  2644.08 ms       | 2484.75 ms   | 2989.07 ms   |
+| BestCompression |4145823 bytes|520358 bytes|  2786.46 ms       | 2717.4 ms    | 2935.13 ms   |
+
+### .slp (binary file) decompression benchmark (5 runs)
+| Preset (when compressed)| Size before | Size after  | Average time      | Min. time    |Max. time     |
+| :-----:                 |:----------: | :----------:| :---------------: |:------------:|:------------:|
+| Fastest                 |702789 bytes |4145823 bytes|  85.0789 ms       | 83.7808 ms   | 88.1575 ms   |
+| Fast                    |677754 bytes |4145823 bytes|  80.7464 ms       | 79.6905 ms   | 83.0007 ms   |
+| Default                 |572742 bytes |4145823 bytes|  77.9139 ms       | 76.8213 ms   | 80.2231 ms   |
+| GoodCompression         |521168 bytes |4145823 bytes|  74.3823 ms       | 74.1    ms   | 74.9492 ms   |
+| BestCompression         |520358 bytes |4145823 bytes|  74.4131 ms       | 73.9829 ms   | 75.7451 ms   |
 
 # Credits
 All credits goes to **Igor Pavlov**, the genius behind the LZMA compression algorithm. He has distributed all his work under Public Domain for anyone to use. PocketLzma uses parts of Igor Pavlov's LZMA related C code in [LZMA SDK v19.00](https://www.7-zip.org/sdk.html).
