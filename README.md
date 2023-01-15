@@ -1,3 +1,8 @@
+[![Windows (MSVC)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-windows-msvc.yml/badge.svg)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-windows-msvc.yml)
+[![Linux (GCC)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-linux-gcc.yml/badge.svg)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-linux-gcc.yml)
+[![Linux (Clang)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-linux-clang.yml/badge.svg)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-linux-clang.yml)
+[![MacOS (Clang)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-macos-clang.yml/badge.svg)](https://github.com/SSBMTonberry/pocketlzma/actions/workflows/ci-macos-clang.yml)
+
 # PocketLzma
 PocketLzma is a cross-platform singleheader `LZMA` compression/decompression library for C++11. To use it, all you need is one
 `pocketlzma.hpp` file, and you are good to go! The library is able to read data from both `files` and `memory`!
@@ -285,3 +290,4 @@ status = p.decompress(bytes, decompressed);
 All credits goes to **Igor Pavlov**, the genius behind the LZMA compression algorithm. He has distributed all his work under Public Domain for anyone to use. PocketLzma uses parts of Igor Pavlov's LZMA related C code in [LZMA SDK v19.00](https://www.7-zip.org/sdk.html).
 
 While PocketLzma goes under the still very permissive `BSD-2-Clause License` I've created an optional cross-platform amalgamated `lzma_c.hpp`, which contains a slightly altered version of Igor Pavlov's LZMA implementation for C, and is released under the same Public Domain license to honor Igor's work. This can be found in the `extras` folder, but keep in mind that this file is not supported in any way and may not co-exist with PocketLzma. 
+

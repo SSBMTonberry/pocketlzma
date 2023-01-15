@@ -2,9 +2,9 @@ name: Windows (MSVC)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   Windows_2019:

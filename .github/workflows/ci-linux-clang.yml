@@ -2,16 +2,16 @@ name: Linux (Clang)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   Linux_clang:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        clangver: [ 8, 11, 12, 13 ]
+        clangver: [ 6.0, 7, 8, 9, 10, 11, 12, 13, 14, 15 ]
     steps:
       - name: Set up cmake
         uses: jwlawson/actions-setup-cmake@v1.13
