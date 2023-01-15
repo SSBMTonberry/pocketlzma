@@ -17,8 +17,9 @@ TEST_CASE("Another simple compile test for LZMA C - expect compile OK and no err
         156, 4, 4, 4, 9, 78, 192, 82, 33, 91
     };
 
+    const size_t outputSizeConst = 1024;
     size_t outputSize = 1024;
-    uint8_t output[outputSize];
+    uint8_t output[outputSizeConst];
     uint8_t props[12];
     size_t propsSize = 5;
 
