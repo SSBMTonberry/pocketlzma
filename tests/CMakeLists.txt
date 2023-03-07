@@ -17,4 +17,16 @@ configure_file (
 
 add_executable(pocketlzma_tests tests_main.cpp tests_file.cpp)
 
+if(LINUX)
+    target_link_libraries(pocketlzma_tests pthread)
+elseif(APPLE)
+    target_link_libraries(pocketlzma_tests c++ pthread)
+elseif(WINDOWS)
+    if(MSVC)
+        target_compile_options(pocketlzma_tests PUBLIC /bigobj /W4 /WX)
+    else()
+        target_compile_options(pocketlzma_tests PUBLIC)
+    endif()
+endif()
+
 unset(RUN_BENCHMARK_TESTS CACHE)

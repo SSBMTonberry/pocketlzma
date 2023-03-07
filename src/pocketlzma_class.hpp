@@ -9,23 +9,35 @@ namespace plz
 {
     class PocketLzma
     {
-        public:
-            PocketLzma() = default;
-            inline explicit PocketLzma(Preset preset);
-            inline explicit PocketLzma(const Settings &settings) : m_settings {settings} {};
-            inline void setSettings(const Settings &settings);
-            inline void usePreset (Preset preset);
+    public:
+        PocketLzma() = default;
 
-            inline StatusCode compress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output);
-            inline StatusCode compress(const uint8_t *input, const size_t inputSize, std::vector<uint8_t> &output);
+        inline explicit PocketLzma(Preset preset);
 
-            inline StatusCode decompress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output);
-            inline StatusCode decompress(const uint8_t *input, const size_t inputSize, std::vector<uint8_t> &output);
+        inline explicit PocketLzma(const Settings &settings) : m_settings{settings}
+        {};
 
-            inline StatusCode decompressBuffered(const std::vector<uint8_t> &input, std::vector<uint8_t> &output, uint32_t bufferSize = PLZ_BUFFER_SIZE);
-            inline StatusCode decompressBuffered(const uint8_t *input, const size_t inputSize, std::vector<uint8_t> &output, uint32_t bufferSize = PLZ_BUFFER_SIZE);
-        private:
-            Settings m_settings {};
+        inline void setSettings(const Settings &settings);
+
+        inline void usePreset(Preset preset);
+
+        inline StatusCode compress(const std::vector <uint8_t> &input, std::vector <uint8_t> &output);
+
+        inline StatusCode compress(const uint8_t *input, const size_t inputSize, std::vector <uint8_t> &output);
+
+        inline StatusCode decompress(const std::vector <uint8_t> &input, std::vector <uint8_t> &output);
+
+        inline StatusCode decompress(const uint8_t *input, const size_t inputSize, std::vector <uint8_t> &output);
+
+        inline StatusCode decompressBuffered(const std::vector <uint8_t> &input, std::vector <uint8_t> &output,
+                                             uint32_t bufferSize = PLZ_BUFFER_SIZE);
+
+        inline StatusCode
+        decompressBuffered(const uint8_t *input, const size_t inputSize, std::vector <uint8_t> &output,
+                           uint32_t bufferSize = PLZ_BUFFER_SIZE);
+
+    private:
+        Settings m_settings{};
     };
 
     PocketLzma::PocketLzma(Preset preset)
@@ -66,7 +78,7 @@ namespace plz
         return compress(&input[0], input.size(), output);
     }
 
-    StatusCode PocketLzma::compress(const uint8_t *input, const size_t inputSize, std::vector<uint8_t> &output)
+    StatusCode PocketLzma::compress(const uint8_t *input, const size_t inputSize, std::vector <uint8_t> &output)
     {
         m_settings.validate();
         size_t propsSize = LZMA_PROPS_SIZE;
@@ -74,15 +86,17 @@ namespace plz
 
         size_t outSize = inputSize + (inputSize / 3) + 128;
         //uint8_t out[outSize];
-        std::unique_ptr<uint8_t[]> out(new uint8_t[outSize]);
+        std::unique_ptr < uint8_t[] > out(new uint8_t[outSize]);
 
-        int rc = plz::c::LzmaCompress(&out[0], &outSize, input, inputSize, propsEncoded, &propsSize, m_settings.level, m_settings.dictionarySize,
-                                      m_settings.literalContextBits,m_settings.literalPositionBits,m_settings.positionBits,m_settings.fastBytes,1);
+        int rc = plz::c::LzmaCompress(&out[0], &outSize, input, inputSize, propsEncoded, &propsSize, m_settings.level,
+                                      m_settings.dictionarySize,
+                                      m_settings.literalContextBits, m_settings.literalPositionBits,
+                                      m_settings.positionBits, m_settings.fastBytes, 1);
 
         StatusCode status = static_cast<StatusCode>(rc);
-        if(status == StatusCode::Ok)
+        if (status == StatusCode::Ok)
         {
-            std::vector<uint8_t> sizeBits;
+            std::vector <uint8_t> sizeBits;
             for (int i = 0; i < 8; i++)
                 sizeBits.push_back((inputSize >> (i * 8)) & 0xFF);
 
@@ -104,7 +118,7 @@ namespace plz
      * @param output The decompressed data
      * @return Status for the decompression process
      */
-    StatusCode PocketLzma::decompress(const std::vector<uint8_t> &input, std::vector<uint8_t> &output)
+    StatusCode PocketLzma::decompress(const std::vector <uint8_t> &input, std::vector <uint8_t> &output)
     {
         return decompress(&input[0], input.size(), output);
     }
@@ -119,9 +133,9 @@ namespace plz
      * @param output The decompressed data
      * @return Status for the decompression process
      */
-    StatusCode PocketLzma::decompress(const uint8_t *input, const size_t inputSize, std::vector<uint8_t> &output)
+    StatusCode PocketLzma::decompress(const uint8_t *input, const size_t inputSize, std::vector <uint8_t> &output)
     {
-        if(inputSize <= PLZ_MINIMUM_LZMA_SIZE)
+        if (inputSize <= PLZ_MINIMUM_LZMA_SIZE)
             return StatusCode::InvalidLzmaData;
 
         size_t propsSize = LZMA_PROPS_SIZE + 8; //header + decompress_size
@@ -131,18 +145,18 @@ namespace plz
         for (int i = 0; i < 8; i++)
         {
             uint8_t value = input[LZMA_PROPS_SIZE + i];
-            if(value != 0xFF)
+            if (value != 0xFF)
                 sizeInfoMissing = false;
 
             size |= (value << (i * 8));
         }
 
-        if(sizeInfoMissing)
+        if (sizeInfoMissing)
             return decompressBuffered(input, inputSize, output, PLZ_BUFFER_SIZE); //StatusCode::MissingSizeInfoInHeader;
 
         size_t outSize = size;
         //uint8_t out[size];
-        std::unique_ptr<uint8_t[]> out(new uint8_t[size]);
+        std::unique_ptr < uint8_t[] > out(new uint8_t[size]);
 
         size_t inSize = inputSize - propsSize;
         int rc = plz::c::LzmaUncompress(&out[0], &outSize, &input[propsSize], &inSize, &input[0], LZMA_PROPS_SIZE);
@@ -169,7 +183,8 @@ namespace plz
      * @param bufferSize The buffer size. Default buffer size for pocketlzma is 65536 bytes.
      * @return Status for the decompression process
      */
-    StatusCode PocketLzma::decompressBuffered(const std::vector<uint8_t> &input, std::vector<uint8_t> &output, uint32_t bufferSize)
+    StatusCode PocketLzma::decompressBuffered(const std::vector <uint8_t> &input, std::vector <uint8_t> &output,
+                                              uint32_t bufferSize)
     {
         return decompressBuffered(&input[0], input.size(), output, bufferSize);
     }
@@ -189,9 +204,11 @@ namespace plz
      * @param bufferSize The buffer size. Default buffer size for pocketlzma is 65536 bytes.
      * @return Status for the decompression process
      */
-    StatusCode PocketLzma::decompressBuffered(const uint8_t *input, const size_t inputSize, std::vector<uint8_t> &output, uint32_t bufferSize)
+    StatusCode
+    PocketLzma::decompressBuffered(const uint8_t *input, const size_t inputSize, std::vector <uint8_t> &output,
+                                   uint32_t bufferSize)
     {
-        if(inputSize <= PLZ_MINIMUM_LZMA_SIZE)
+        if (inputSize <= PLZ_MINIMUM_LZMA_SIZE)
             return StatusCode::InvalidLzmaData;
 
         //size_t unpackSize = 0;
@@ -203,7 +220,7 @@ namespace plz
         unsigned char header[LZMA_PROPS_SIZE + 8]; //MSVC requires this fully constant...
 
         //Read header data
-        for(int i = 0; i < propsSize; ++i)
+        for (int i = 0; i < propsSize; ++i)
             header[i] = input[i];
 
         LzmaDec_Construct(&state);
@@ -211,7 +228,7 @@ namespace plz
         res = LzmaDec_Allocate(&state, header, LZMA_PROPS_SIZE, &plz::c::g_Alloc);
 
         //uint8_t outBuf[bufferSize];
-        std::unique_ptr<uint8_t[]> outBuf(new uint8_t[bufferSize]);
+        std::unique_ptr < uint8_t[] > outBuf(new uint8_t[bufferSize]);
         size_t inPos = 0, inSize = 0, outPos = 0;
         inSize = inputSize - propsSize;
         plz::c::LzmaDec_Init(&state);
