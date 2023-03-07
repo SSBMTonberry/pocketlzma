@@ -3,7 +3,8 @@
 //
 
 #define POCKETLZMA_LZMA_C_DEFINE
-#include "pocketlzma.hpp"
+//#include "pocketlzma.hpp"
+#include "src/pocketlzma.h"
 #include <chrono>
 
 //#include <cstdarg>  // For va_start, etc.
