@@ -28,12 +28,19 @@
 
 #include "7zTypes.h"
 #include "Precomp.h"
+#include "CpuArch.h"
+#include "Threads.h"
+#include "LzFindMt.h"
 #include "Alloc.h"
 #include "LzmaDec.h"
 #include "LzmaEnc.h"
 #include "LzmaLib.h"
 
 #ifdef LZMA_C_DEFINE
+    #include "CpuArch.c"
+    #include "Threads.c"
+    #include "LzFindMt.c"
+    #include "LzFindOpt.c"
     #include "Alloc.c"
     #include "LzmaDec.c"
     #include "LzmaEnc.c"

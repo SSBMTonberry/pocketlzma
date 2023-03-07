@@ -286,6 +286,21 @@ status = p.decompress(bytes, decompressed);
 | GoodCompression         |521168 bytes |4145823 bytes|  29.4726 ms       | 29.4448 ms   | 29.51 ms     |
 | BestCompression         |520358 bytes |4145823 bytes|  29.5008 ms       | 29.468 ms    | 29.6048 ms   |
 
+## Benchmark 3 v1.0 VS v1.1 compressions
+
+v1.1 of `pocketlzma` introduces cross-platform multithreaded compression.
+While this does not give any significant performance boost for small json-files, it give a slight boost for larger binary files.
+Results using the `.slp` files from previous benchmarks
+
+| Preset          | Size before | Size after | Average time v1.0      | Average time v1.1    | Improvement  |
+| :-----:         |:----------: | :---------:| :--------------------: |:--------------------:|:------------:|
+| Fastest         |4145823 bytes|702789 bytes|  83.8579 ms            | 78.0714 ms           |   7,4%       |
+| Fast            |4145823 bytes|677754 bytes|  125.257 ms            | 120.47 ms            |   4%         |
+| Default         |4145823 bytes|572742 bytes|  813.151 ms            | 748.197 ms           |   8,6%       |
+| GoodCompression |4145823 bytes|521168 bytes|  1237.8 ms             | 1187.89 ms           |   4,2%       |
+| BestCompression |4145823 bytes|520358 bytes|  1313.7 ms             | 1292.89 ms           |   1,6%       |
+
+
 # Credits
 All credits goes to **Igor Pavlov**, the genius behind the LZMA compression algorithm. He has distributed all his work under Public Domain for anyone to use. PocketLzma uses parts of Igor Pavlov's LZMA related C code in [LZMA SDK v19.00](https://www.7-zip.org/sdk.html).
 

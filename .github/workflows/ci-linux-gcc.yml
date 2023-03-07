@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        gccver: [ 7, 8, 9, 10, 11 ]
+        gccver: [ 7, 11 ]
     steps:
       - name: Set up cmake
         uses: jwlawson/actions-setup-cmake@v1.13

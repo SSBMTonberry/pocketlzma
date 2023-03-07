@@ -57,13 +57,19 @@ namespace plz
     {
         #include "lzma_c/7zTypes.h"
         #include "lzma_c/Precomp.h"
+        #include "lzma_c/CpuArch.h"
+        #include "lzma_c/Threads.h"
+        #include "lzma_c/LzFindMt.h"
         #include "lzma_c/Alloc.h"
         #include "lzma_c/LzmaDec.h"
         #include "lzma_c/LzmaEnc.h"
-
         #include "lzma_c/LzmaLib.h"
 
         #ifdef POCKETLZMA_LZMA_C_DEFINE
+            #include "lzma_c/CpuArch.c"
+            #include "lzma_c/Threads.c"
+            #include "lzma_c/LzFindMt.c"
+            #include "lzma_c/LzFindOpt.c"
             #include "lzma_c/Alloc.c"
             #include "lzma_c/LzmaDec.c"
             #include "lzma_c/LzmaEnc.c"
